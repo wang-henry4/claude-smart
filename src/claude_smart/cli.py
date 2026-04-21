@@ -4,11 +4,12 @@ Exposes four subcommands:
 
 - ``install``: register the GitHub marketplace and install the plugin into
   Claude Code, then seed ``~/.reflexio/.env`` with the local-provider flags.
-- ``playbook``: print the current project playbook (as markdown).
-- ``sync``: force reflexio to run extraction on all unpublished interactions.
-- ``correct "<note>"``: append a ``[correction]``-prefixed turn to the
-  active session buffer so reflexio's extractor sees the signal on the
-  next sync.
+- ``show``: print the current project playbook and session user profiles
+  (as markdown).
+- ``learn``: force reflexio to run extraction on all unpublished interactions.
+- ``tag "<note>"``: append a ``[correction]``-prefixed turn to the active
+  session buffer so reflexio's extractor sees the signal on the next
+  ``learn`` pass.
 """
 
 from __future__ import annotations
@@ -24,7 +25,7 @@ from claude_smart import context_format, ids, publish, state
 from claude_smart.reflexio_adapter import Adapter
 
 _REFLEXIO_ENV_PATH = Path.home() / ".reflexio" / ".env"
-_DEFAULT_MARKETPLACE_SOURCE = "yilu/claude-smart"
+_DEFAULT_MARKETPLACE_SOURCE = "ReflexioAI/claude-smart"
 _PLUGIN_SPEC = "claude-smart@yilu"
 
 
@@ -102,21 +103,36 @@ def cmd_install(args: argparse.Namespace) -> int:
     return 0
 
 
-def cmd_playbook(args: argparse.Namespace) -> int:
+def cmd_show(args: argparse.Namespace) -> int:
+    """Print the current project playbook and session user profiles.
+
+    The session profile fetch defaults to the most-recently-modified session
+    buffer so ``/show`` surfaces both playbook rules and user profiles in one
+    pass, without the caller having to know the session id.
+
+    Args:
+        args (argparse.Namespace): Parsed CLI args. Honors ``args.project``
+            (override project id) and ``args.session`` (override session id;
+            falls back to the latest session buffer).
+
+    Returns:
+        int: 0 on success.
+    """
     project_id = args.project or ids.resolve_project_id()
+    session_id = args.session or _latest_session_id()
     adapter = Adapter()
     playbooks = adapter.fetch_project_playbooks(project_id)
-    profiles: list = []
-    if args.session:
-        profiles = adapter.fetch_session_profiles(args.session)
+    profiles: list = adapter.fetch_session_profiles(session_id) if session_id else []
     md = context_format.render(
         project_id=project_id, playbooks=playbooks, profiles=profiles
     )
-    sys.stdout.write(md or f"_No playbook yet for project `{project_id}`._\n")
+    sys.stdout.write(
+        md or f"_No playbook or profiles yet for project `{project_id}`._\n"
+    )
     return 0
 
 
-def cmd_sync(args: argparse.Namespace) -> int:
+def cmd_learn(args: argparse.Namespace) -> int:
     session_id = args.session or _latest_session_id()
     if not session_id:
         sys.stdout.write("No active claude-smart session buffer found.\n")
@@ -126,11 +142,11 @@ def cmd_sync(args: argparse.Namespace) -> int:
         session_id=session_id, project_id=project_id, force_extraction=True
     )
     if status == "nothing":
-        sys.stdout.write(f"Session `{session_id}`: nothing to sync.\n")
+        sys.stdout.write(f"Session `{session_id}`: nothing to learn from.\n")
         return 0
     if status == "ok":
         sys.stdout.write(
-            f"Synced {count} interactions to reflexio "
+            f"Published {count} interactions to reflexio "
             f"(user_id={session_id}, agent_version={project_id}). "
             "Extraction running.\n"
         )
@@ -142,7 +158,7 @@ def cmd_sync(args: argparse.Namespace) -> int:
     return 1
 
 
-def cmd_correct(args: argparse.Namespace) -> int:
+def cmd_tag(args: argparse.Namespace) -> int:
     session_id = args.session or _latest_session_id()
     if not session_id:
         sys.stdout.write("No active claude-smart session buffer found.\n")
@@ -172,22 +188,26 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     inst.set_defaults(func=cmd_install)
 
-    pb = sub.add_parser("playbook", help="Show the current project playbook")
-    pb.add_argument("--project", help="Override project id")
-    pb.add_argument("--session", help="Include session profile for this session_id")
-    pb.set_defaults(func=cmd_playbook)
-
-    sy = sub.add_parser("sync", help="Force reflexio extraction now")
-    sy.add_argument("--project", help="Override project id")
-    sy.add_argument("--session", help="Session id (defaults to latest)")
-    sy.set_defaults(func=cmd_sync)
-
-    co = sub.add_parser(
-        "correct", help="Tag the current session with a correction note"
+    sh = sub.add_parser(
+        "show",
+        help="Show the current project playbook and session user profiles",
     )
-    co.add_argument("note", nargs="?", default="", help="Correction description")
-    co.add_argument("--session", help="Session id (defaults to latest)")
-    co.set_defaults(func=cmd_correct)
+    sh.add_argument("--project", help="Override project id")
+    sh.add_argument(
+        "--session",
+        help="Session id for profile lookup (defaults to latest session)",
+    )
+    sh.set_defaults(func=cmd_show)
+
+    ln = sub.add_parser("learn", help="Force reflexio extraction now")
+    ln.add_argument("--project", help="Override project id")
+    ln.add_argument("--session", help="Session id (defaults to latest)")
+    ln.set_defaults(func=cmd_learn)
+
+    tg = sub.add_parser("tag", help="Tag the current session with a correction note")
+    tg.add_argument("note", nargs="?", default="", help="Correction description")
+    tg.add_argument("--session", help="Session id (defaults to latest)")
+    tg.set_defaults(func=cmd_tag)
     return parser
 
 

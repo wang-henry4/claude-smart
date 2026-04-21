@@ -11,13 +11,13 @@
     "playbook",
     "learning"
   ],
-  "homepage": "https://github.com/yilu/claude-smart#readme",
+  "homepage": "https://github.com/ReflexioAI/claude-smart#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/yilu/claude-smart.git"
+    "url": "git+https://github.com/ReflexioAI/claude-smart.git"
   },
   "bugs": {
-    "url": "https://github.com/yilu/claude-smart/issues"
+    "url": "https://github.com/ReflexioAI/claude-smart/issues"
   },
   "license": "Apache-2.0",
   "author": "Yi Lu",

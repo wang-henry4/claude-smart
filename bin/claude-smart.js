@@ -14,7 +14,7 @@ const { appendFileSync, existsSync, mkdirSync, readFileSync } = require("fs");
 const { homedir } = require("os");
 const { dirname, join } = require("path");
 
-const DEFAULT_MARKETPLACE_SOURCE = "yilu/claude-smart";
+const DEFAULT_MARKETPLACE_SOURCE = "ReflexioAI/claude-smart";
 const PLUGIN_SPEC = "claude-smart@yilu";
 const REFLEXIO_ENV_PATH = join(homedir(), ".reflexio", ".env");
 

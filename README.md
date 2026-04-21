@@ -57,7 +57,7 @@ The result is a compact, always-up-to-date set of instructions Claude reads at t
 
 ```bash
 # 1. Clone with the reflexio backend submodule
-git clone --recurse-submodules https://github.com/yilu/claude-smart.git
+git clone --recurse-submodules https://github.com/ReflexioAI/claude-smart.git
 cd claude-smart
 
 # 2. Install dependencies (creates a uv-managed venv, pulls reflexio as a path dep)
@@ -99,7 +99,7 @@ Restart Claude Code in this workspace. The first time you correct Claude on some
 - 📥 **Automatic hook ingestion** — `SessionStart`, `UserPromptSubmit`, `PostToolUse`, `Stop`, `SessionEnd` all wired up; you don't run anything manually.
 - 🏷️ **Correction-aware** — Corrective phrasings (`"no, don't"`, `"actually"`, `"stop"`, `"wrong"`) are detected and weighted during extraction.
 - 🧪 **Offline resilience** — If the reflexio backend is down, hooks buffer to disk; the next successful publish drains them.
-- 🧰 **Three slash commands** — `/smart-playbook`, `/smart-sync`, `/smart-correct` for on-demand control.
+- 🧰 **Three slash commands** — `/show`, `/learn`, `/tag` for on-demand control.
 
 ---
 
@@ -116,7 +116,7 @@ Restart Claude Code in this workspace. The first time you correct Claude on some
 2. **Local state buffer** — JSONL per session at `~/.claude-smart/sessions/{session_id}.jsonl`. Offline-safe.
 3. **Reflexio backend** (submodule at `reflexio/`) — SQLite storage, hybrid search, profile/playbook extraction, dedup, status lifecycle (`CURRENT` → `ARCHIVED`). Runs on `localhost:8081`.
 4. **Claude Code LLM provider** — a LiteLLM custom provider registered inside reflexio. Every generation call (extraction, update, dedup, evaluation) subprocesses `claude -p --output-format json`, so no OpenAI/Anthropic key is needed for the learning loop.
-5. **Three slash commands** — `/smart-playbook`, `/smart-sync`, `/smart-correct`.
+5. **Three slash commands** — `/show`, `/learn`, `/tag`.
 
 **Data flow:**
 
@@ -157,7 +157,7 @@ If you just want the plugin wired into Claude Code (marketplace added, plugin in
 
 ```bash
 # uvx — pulls the Python package straight from git, no clone required
-uvx --from git+https://github.com/yilu/claude-smart claude-smart install
+uvx --from git+https://github.com/ReflexioAI/claude-smart claude-smart install
 
 # npx — same thing via the published npm wrapper
 npx claude-smart install
@@ -165,7 +165,7 @@ npx claude-smart install
 
 Both do the same three things:
 
-1. `claude plugin marketplace add yilu/claude-smart`
+1. `claude plugin marketplace add ReflexioAI/claude-smart`
 2. `claude plugin install claude-smart@yilu`
 3. Append `CLAUDE_SMART_USE_LOCAL_CLI=1` and `CLAUDE_SMART_USE_LOCAL_EMBEDDING=1` to `~/.reflexio/.env` (idempotent).
 
@@ -186,7 +186,7 @@ For a manual, step-by-step walkthrough, see below.
 ### Step 1 — Clone the repository (with the reflexio submodule)
 
 ```bash
-git clone --recurse-submodules https://github.com/yilu/claude-smart.git
+git clone --recurse-submodules https://github.com/ReflexioAI/claude-smart.git
 cd claude-smart
 
 # If you forgot --recurse-submodules
@@ -276,16 +276,16 @@ Restart Claude Code. On the next session start you should see reflexio logs show
 Inside Claude Code:
 
 ```
-/smart-playbook
+/show
 ```
 
-On a fresh project you'll see `_No playbook yet for project `<name>`._` — correct. Have a conversation, include at least one genuine correction (`"no, don't use X — use Y"`), then:
+On a fresh project you'll see `_No playbook or profiles yet for project `<name>`._` — correct. Have a conversation, include at least one genuine correction (`"no, don't use X — use Y"`), then:
 
 ```
-/smart-sync
+/learn
 ```
 
-That forces immediate extraction. Run `/smart-playbook` again after ~20–30 seconds; the extracted rule should appear.
+That forces immediate extraction. Run `/show` again after ~20–30 seconds; the extracted rule should appear.
 
 ---
 
@@ -293,9 +293,9 @@ That forces immediate extraction. Run `/smart-playbook` again after ~20–30 sec
 
 | Command | What it does |
 | --- | --- |
-| `/smart-playbook` | Print the current project playbook (same markdown that `SessionStart` injects). Use it to audit what rules Claude is being told to follow. |
-| `/smart-sync` | Force reflexio to run extraction *now* on the current session's unpublished interactions. Without this, extraction runs at the end of the session or on reflexio's batch interval. |
-| `/smart-correct [note]` | Tag the most recent turn as a correction, for cases the automatic heuristic missed. The note becomes the correction description the extractor sees. |
+| `/show` | Print the current project playbook plus the current session's user profiles (same markdown that `SessionStart` injects). Use it to audit what rules and preferences Claude is being told to follow. |
+| `/learn` | Force reflexio to run extraction *now* on the current session's unpublished interactions. Without this, extraction runs at the end of the session or on reflexio's batch interval. |
+| `/tag [note]` | Tag the most recent turn as a correction, for cases the automatic heuristic missed. The note becomes the correction description the extractor sees. |
 
 ---
 
@@ -349,7 +349,7 @@ Registration is opt-in (`CLAUDE_SMART_USE_LOCAL_CLI=1`) and idempotent, so enabl
 ## Troubleshooting
 
 **SessionStart injects nothing after a correction.**
-Extraction is async by default. Run `/smart-sync` to force it, wait ~20–30s, then open a new session. `/smart-playbook` shows whether the rule was actually extracted.
+Extraction is async by default. Run `/learn` to force it, wait ~20–30s, then run `/show` — no new session needed. `/show` shows whether the rule was actually extracted.
 
 **Reflexio refuses to boot with "no embedding-capable provider".**
 Check that `CLAUDE_SMART_USE_LOCAL_EMBEDDING=1` is in `~/.reflexio/.env` *and* that `chromadb` is installed in the venv (`uv run python -c "import chromadb"` should print nothing). If you'd rather use a cloud embedder instead, drop the env flag and set `OPENAI_API_KEY` or `GEMINI_API_KEY` in the same file.
