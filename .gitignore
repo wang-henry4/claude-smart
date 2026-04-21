@@ -34,3 +34,6 @@ Thumbs.db
 
 # Makefile sed backups
 *.bak
+
+# Experiment
+benchmarks/memory_comparison/results
