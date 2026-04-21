@@ -14,7 +14,39 @@ Internal notes for maintainers of `claude-smart`. End-user install instructions 
 | `.claude-plugin/plugin.json` | Plugin metadata read by Claude Code |
 | `.claude-plugin/marketplace.json` | Marketplace entry — `claude plugin marketplace add` reads this |
 | `reflexio/` | Submodule — Apache 2.0, storage + search + extraction backend |
+| `dashboard/` | Next.js management UI for interactions, profiles, playbooks, configuration |
 | `Makefile` | Release automation |
+
+## Dashboard
+
+A standalone Next.js app at `dashboard/` that gives a visual view of what
+claude-smart has learned:
+
+- **Interactions** — session list + transcript reader backed by
+  `~/.claude-smart/sessions/*.jsonl` (read server-side in
+  `dashboard/app/api/sessions/route.ts`).
+- **Profiles / Playbooks** — reflexio data fetched via a proxy route
+  (`dashboard/app/api/reflexio/[...path]/route.ts`) that forwards to the URL
+  configured in the top bar; defaults to `http://localhost:8081`.
+- **Configure** — reads and writes `~/.reflexio/.env`, but only the known
+  claude-smart keys. Unknown keys (API secrets, user additions) are preserved
+  on write and never returned to the browser.
+
+Stack mirrors `reflexio/docs/` exactly (Next.js 16, Tailwind v4, shadcn
+base-nova, Base UI primitives, Lucide icons, `next-themes`). Runs on port
+3001 so it can coexist with reflexio's docs site on 3000.
+
+```bash
+cd dashboard
+npm install
+npm run dev     # http://localhost:3001
+npm run build
+npm run lint
+```
+
+**Next.js 16 caveat** — the same one reflexio/docs flags: APIs and
+conventions differ from anything pre-16. Before touching route handlers or
+dynamic-param types, consult `dashboard/node_modules/next/dist/docs/`.
 
 ## Versioning
 

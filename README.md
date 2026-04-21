@@ -371,6 +371,30 @@ rm -rf ~/.reflexio/data/           # reflexio SQLite store
 
 ---
 
+## Dashboard (web UI)
+
+A Next.js management UI lives in [`dashboard/`](dashboard/). Use it to browse
+local session buffers, inspect extracted user profiles, edit and archive
+project playbooks, and tweak the claude-smart environment. It connects to the
+same reflexio backend the plugin uses, so run that first.
+
+```bash
+# 1. reflexio backend on :8081 (see Step 4 above)
+uv run reflexio services start --only backend --no-reload
+
+# 2. install and run the dashboard
+cd dashboard
+npm install
+npm run dev   # http://localhost:3001
+```
+
+The dashboard reads `~/.claude-smart/sessions/*.jsonl` directly (server-side)
+for in-flight session transcripts and proxies everything else through reflexio.
+All state lives where the CLI already keeps it — the dashboard does not
+introduce a second source of truth.
+
+---
+
 ## Development
 
 Run the test suite:
