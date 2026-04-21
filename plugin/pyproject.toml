@@ -1,6 +1,6 @@
 [project]
 name = "claude-smart"
-version = "0.1.3"
+version = "0.1.4"
 description = "Self-improving Claude Code plugin — learns from corrections via reflexio"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -26,13 +26,15 @@ packages = ["src/claude_smart"]
 [tool.hatch.build.targets.sdist]
 include = [
     "src/claude_smart",
+    "pyproject.toml",
     "README.md",
     "LICENSE",
-    "pyproject.toml",
 ]
 
-[tool.uv.sources]
-reflexio-ai = { path = "./reflexio", editable = true }
-
 [tool.pytest.ini_options]
-testpaths = ["tests"]
+testpaths = ["../tests"]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.3",
+]

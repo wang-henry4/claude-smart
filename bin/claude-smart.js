@@ -110,10 +110,9 @@ function runInstall(args) {
   process.stdout.write(
     [
       "",
-      "claude-smart installed. Next steps:",
-      "  1. Start the reflexio backend (leave it running in another terminal):",
-      "       uv run reflexio services start --only backend --no-reload",
-      "  2. Restart Claude Code in your project.",
+      "claude-smart installed. Restart Claude Code in your project.",
+      "The reflexio backend and dashboard auto-start on session start.",
+      "Opt out with CLAUDE_SMART_BACKEND_AUTOSTART=0 or CLAUDE_SMART_DASHBOARD_AUTOSTART=0.",
       "",
     ].join("\n"),
   );

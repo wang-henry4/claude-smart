@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Dispatch a Claude Code hook event to the claude_smart Python package.
-# The plugin's CLAUDE_PLUGIN_ROOT lives at <repo>/plugin, so the Python
-# project root is one directory up. We invoke via `uv run --project` so
-# the reflexio path dep and pinned env from uv.lock are used.
+# CLAUDE_PLUGIN_ROOT points at the plugin dir (dev: <repo>/plugin;
+# installed: ~/.claude/plugins/cache/reflexioai/claude-smart/<version>),
+# which is also the Python project root with pyproject.toml + uv.lock.
+# We invoke via `uv run --project` so the pinned env from uv.lock is used.
 #
 # If the Setup hook recorded an install failure at
 # ~/.claude-smart/install-failed, short-circuit with a user-visible
@@ -16,7 +17,7 @@ if [ -z "$EVENT" ]; then
 fi
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
-PROJECT_ROOT="$(cd "$HERE/../.." && pwd)"
+PLUGIN_ROOT="$(cd "$HERE/.." && pwd)"
 
 FAILURE_MARKER="$HOME/.claude-smart/install-failed"
 if [ -f "$FAILURE_MARKER" ]; then
@@ -49,4 +50,4 @@ if ! command -v uv >/dev/null 2>&1; then
 fi
 
 # Stdin is the hook payload JSON — stream it through to the Python CLI.
-exec uv run --project "$PROJECT_ROOT" --quiet python -m claude_smart.hook "$EVENT"
+exec uv run --project "$PLUGIN_ROOT" --quiet python -m claude_smart.hook "$EVENT"

@@ -25,7 +25,7 @@ claude_smart_source_login_path
 CMD="${1:-start}"
 PORT=8081
 
-PROJECT_ROOT="$(cd "$HERE/../.." && pwd)"
+PLUGIN_ROOT="$(cd "$HERE/.." && pwd)"
 
 STATE_DIR="$HOME/.claude-smart"
 PID_FILE="$STATE_DIR/backend.pid"
@@ -96,29 +96,31 @@ case "$CMD" in
       echo "[claude-smart] backend: uv not on PATH; skipping" >>"$LOG_FILE"
       emit_ok; exit 0
     fi
-    if [ ! -d "$PROJECT_ROOT/reflexio" ]; then
-      echo "[claude-smart] backend: reflexio submodule missing — run plugin Setup" >>"$LOG_FILE"
-      emit_ok; exit 0
-    fi
+    cd "$PLUGIN_ROOT"
 
-    cd "$PROJECT_ROOT"
+    # Cap local interaction history to keep the SQLite store small for
+    # claude-smart users. Reflexio's library defaults are much higher
+    # (250k/50k) for server deployments; here we override only in the
+    # claude-smart plugin context. Users can still override via env.
+    export INTERACTION_CLEANUP_THRESHOLD="${INTERACTION_CLEANUP_THRESHOLD:-1000}"
+    export INTERACTION_CLEANUP_DELETE_COUNT="${INTERACTION_CLEANUP_DELETE_COUNT:-500}"
 
     # --no-reload: uvicorn's reloader forks a supervisor; makes PGID
     # bookkeeping harder and we don't need hot-reload for a user-facing
     # service. Same detach pattern as dashboard-service.sh.
     if command -v setsid >/dev/null 2>&1; then
-      setsid nohup uv run --project "$PROJECT_ROOT" --quiet \
+      setsid nohup uv run --project "$PLUGIN_ROOT" --quiet \
         reflexio services start --only backend --no-reload \
         >>"$LOG_FILE" 2>&1 < /dev/null &
       echo $! > "$PID_FILE"
     elif command -v python3 >/dev/null 2>&1; then
       python3 -c 'import os,sys; os.setsid(); os.execvp(sys.argv[1], sys.argv[1:])' \
-        uv run --project "$PROJECT_ROOT" --quiet \
+        uv run --project "$PLUGIN_ROOT" --quiet \
         reflexio services start --only backend --no-reload \
         >>"$LOG_FILE" 2>&1 < /dev/null &
       echo $! > "$PID_FILE"
     else
-      nohup uv run --project "$PROJECT_ROOT" --quiet \
+      nohup uv run --project "$PLUGIN_ROOT" --quiet \
         reflexio services start --only backend --no-reload \
         >>"$LOG_FILE" 2>&1 < /dev/null &
       svc_pid=$!

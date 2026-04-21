@@ -16,7 +16,7 @@
 .PHONY: help bump release publish publish-npm publish-pypi publish-dry \
         check-version check-clean
 
-VERSION_FILES := package.json pyproject.toml \
+VERSION_FILES := package.json plugin/pyproject.toml \
                  plugin/.claude-plugin/plugin.json .claude-plugin/marketplace.json
 
 help:
@@ -37,8 +37,8 @@ bump: check-version ## Rewrite version in all 4 manifests
 	@echo "→ bumping to $(VERSION)"
 	@sed -i.bak -E 's/"version": "[^"]+"/"version": "$(VERSION)"/' \
 	    package.json plugin/.claude-plugin/plugin.json .claude-plugin/marketplace.json
-	@sed -i.bak -E 's/^version = "[^"]+"/version = "$(VERSION)"/' pyproject.toml
-	@rm -f package.json.bak pyproject.toml.bak \
+	@sed -i.bak -E 's/^version = "[^"]+"/version = "$(VERSION)"/' plugin/pyproject.toml
+	@rm -f package.json.bak plugin/pyproject.toml.bak \
 	       plugin/.claude-plugin/plugin.json.bak .claude-plugin/marketplace.json.bak
 	@echo "→ resulting versions:"
 	@grep -HE '("version"|^version)' $(VERSION_FILES)
@@ -49,18 +49,18 @@ publish-npm: ## Publish the current version to npm
 
 publish-pypi: ## Build and publish the current version to PyPI
 	@echo "→ uv build + uv publish"
-	rm -rf dist/
-	uv build
-	uv publish
+	rm -rf plugin/dist/
+	uv build --project plugin
+	uv publish --project plugin
 
 publish-dry: ## Show what would be published without uploading
 	@echo "→ npm publish --dry-run"
 	@npm publish --dry-run
 	@echo ""
-	@echo "→ uv build (dry: inspect dist/ manually)"
-	rm -rf dist/
-	uv build
-	@ls -la dist/
+	@echo "→ uv build (dry: inspect plugin/dist/ manually)"
+	rm -rf plugin/dist/
+	uv build --project plugin
+	@ls -la plugin/dist/
 
 publish: publish-npm publish-pypi ## Publish to both npm and PyPI
 

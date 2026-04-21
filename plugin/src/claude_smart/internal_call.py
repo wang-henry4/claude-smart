@@ -26,11 +26,20 @@ from typing import Any
 
 _ENV_MARKER = "CLAUDE_SMART_INTERNAL"
 
-# Reflexio submodule lives at <repo>/reflexio; anchor relative to this
-# file (<repo>/src/claude_smart/internal_call.py) so the check follows
-# the real checkout if the repo is relocated.
+# Reflexio submodule lives at <repo>/reflexio when this package runs from
+# a dev checkout (<repo>/plugin/src/claude_smart/internal_call.py); anchor
+# relative to this file so the check follows the real checkout if the
+# repo is relocated. In install mode the submodule is absent — the env
+# marker is the primary signal and this path never matches.
+#
+# The path computation is tightly coupled to the current layout: if this
+# module moves, ``_REFLEXIO_DIR`` silently stops matching and only the
+# env signal remains. ``CLAUDE_SMART_REFLEXIO_DIR`` lets callers (and
+# tests) override the path without touching the module.
 _THIS_DIR = Path(__file__).resolve().parent
-_REFLEXIO_DIR = _THIS_DIR.parents[1] / "reflexio"
+_REFLEXIO_DIR = Path(
+    os.environ.get("CLAUDE_SMART_REFLEXIO_DIR") or _THIS_DIR.parents[2] / "reflexio"
+)
 
 
 def is_internal_invocation(payload: dict[str, Any]) -> bool:
@@ -48,7 +57,7 @@ def is_internal_invocation(payload: dict[str, Any]) -> bool:
     if os.environ.get(_ENV_MARKER) == "1":
         return True
     cwd = payload.get("cwd")
-    if not cwd:
+    if not isinstance(cwd, str) or not cwd:
         return False
     try:
         resolved = Path(cwd).resolve()

@@ -13,7 +13,8 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 . "$HERE/_lib.sh"
 claude_smart_source_login_path
 
-PROJECT_ROOT="$(cd "$HERE/../.." && pwd)"
+PLUGIN_ROOT="$(cd "$HERE/.." && pwd)"
+REPO_ROOT="$(cd "$HERE/../.." && pwd)"
 
 MARKER_DIR="$HOME/.claude-smart"
 FAILURE_MARKER="$MARKER_DIR/install-failed"
@@ -27,20 +28,27 @@ write_failure() {
   exit 0
 }
 
-cd "$PROJECT_ROOT"
-
-echo "[claude-smart] initializing reflexio submodule..." >&2
-if ! git submodule update --init --recursive reflexio >&2; then
-  write_failure "git submodule update failed — is $PROJECT_ROOT a git checkout?"
+# Dev-mode only: when running from a git checkout, pull the reflexio
+# submodule so tests/benchmarks can use its sources. In install mode the
+# plugin lives under ~/.claude/plugins/cache and reflexio-ai resolves
+# from PyPI instead. The guard checks for both `.git` and `.gitmodules`
+# at REPO_ROOT to distinguish a dev checkout from a marketplace cache
+# (where REPO_ROOT has neither).
+if [ -d "$REPO_ROOT/.git" ] && [ -f "$REPO_ROOT/.gitmodules" ]; then
+  echo "[claude-smart] initializing reflexio submodule..." >&2
+  if ! (cd "$REPO_ROOT" && git submodule update --init --recursive reflexio) >&2; then
+    echo "[claude-smart] WARNING: git submodule update failed; continuing with PyPI reflexio-ai" >&2
+  fi
 fi
 
 if ! command -v uv >/dev/null 2>&1; then
   write_failure "uv is not on PATH — install from https://docs.astral.sh/uv/"
 fi
 
+cd "$PLUGIN_ROOT"
 echo "[claude-smart] running uv sync..." >&2
 if ! uv sync --quiet >&2; then
-  write_failure "uv sync failed in $PROJECT_ROOT — run 'uv sync' there to diagnose"
+  write_failure "uv sync failed in $PLUGIN_ROOT — run 'uv sync' there to diagnose"
 fi
 
 # Reflexio's CLI reads ~/.reflexio/.env (see reflexio/cli/env_loader.py);
@@ -65,7 +73,7 @@ fi
 # Pre-install + build the Next.js dashboard so SessionStart can boot it
 # without the multi-minute first-run cost. dashboard-service.sh will retry
 # the build lazily if either step is skipped or fails here.
-DASHBOARD_DIR="$PROJECT_ROOT/dashboard"
+DASHBOARD_DIR="$PLUGIN_ROOT/dashboard"
 if [ -d "$DASHBOARD_DIR" ]; then
   if command -v npm >/dev/null 2>&1; then
     echo "[claude-smart] installing dashboard dependencies..." >&2
@@ -89,5 +97,5 @@ if [ -d "$DASHBOARD_DIR" ]; then
   fi
 fi
 
-echo "[claude-smart] install complete. Start reflexio with: uv run reflexio services start" >&2
+echo "[claude-smart] install complete. Backend and dashboard auto-start on session start." >&2
 echo '{"continue":true,"suppressOutput":true}'

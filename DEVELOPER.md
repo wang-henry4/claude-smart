@@ -6,27 +6,28 @@ Internal notes for maintainers of `claude-smart`. End-user install instructions 
 
 | Path | Purpose |
 | --- | --- |
-| `src/claude_smart/` | Python package — hook handler, CLI, reflexio adapter |
-| `plugin/` | Claude Code plugin — hooks, slash commands, install script |
+| `plugin/` | Claude Code plugin — hooks, slash commands, install script, and the Python package |
+| `plugin/src/claude_smart/` | Python package — hook handler, CLI, reflexio adapter |
+| `plugin/pyproject.toml` | Python manifest — shipped to PyPI via `uv build --project plugin` |
+| `tests/` | Pytest suite for the Python package (run via `uv run --project plugin pytest tests/ -q` from repo root) |
 | `bin/claude-smart.js` | Node wrapper so `npx claude-smart install` works |
 | `package.json` | npm manifest — only ships `bin/`, `README.md`, `LICENSE` |
-| `pyproject.toml` | Python manifest — shipped to PyPI via `uv build` + `uv publish` |
 | `.claude-plugin/plugin.json` | Plugin metadata read by Claude Code |
 | `.claude-plugin/marketplace.json` | Marketplace entry — `claude plugin marketplace add` reads this |
 | `reflexio/` | Submodule — Apache 2.0, storage + search + extraction backend |
-| `dashboard/` | Next.js management UI for interactions, profiles, playbooks, configuration |
+| `plugin/dashboard/` | Next.js management UI for interactions, profiles, playbooks, configuration |
 | `Makefile` | Release automation |
 
 ## Dashboard
 
-A standalone Next.js app at `dashboard/` that gives a visual view of what
+A standalone Next.js app at `plugin/dashboard/` that gives a visual view of what
 claude-smart has learned:
 
 - **Interactions** — session list + transcript reader backed by
   `~/.claude-smart/sessions/*.jsonl` (read server-side in
-  `dashboard/app/api/sessions/route.ts`).
+  `plugin/dashboard/app/api/sessions/route.ts`).
 - **Profiles / Playbooks** — reflexio data fetched via a proxy route
-  (`dashboard/app/api/reflexio/[...path]/route.ts`) that forwards to the URL
+  (`plugin/dashboard/app/api/reflexio/[...path]/route.ts`) that forwards to the URL
   configured in the top bar; defaults to `http://localhost:8081`.
 - **Configure** — reads and writes `~/.reflexio/.env`, but only the known
   claude-smart keys. Unknown keys (API secrets, user additions) are preserved
@@ -37,7 +38,7 @@ base-nova, Base UI primitives, Lucide icons, `next-themes`). Runs on port
 3001 so it can coexist with reflexio's docs site on 3000.
 
 ```bash
-cd dashboard
+cd plugin/dashboard
 npm install
 npm run dev     # http://localhost:3001
 npm run build
@@ -46,7 +47,7 @@ npm run lint
 
 **Next.js 16 caveat** — the same one reflexio/docs flags: APIs and
 conventions differ from anything pre-16. Before touching route handlers or
-dynamic-param types, consult `dashboard/node_modules/next/dist/docs/`.
+dynamic-param types, consult `plugin/dashboard/node_modules/next/dist/docs/`.
 
 ## Versioning
 
@@ -55,7 +56,7 @@ dynamic-param types, consult `dashboard/node_modules/next/dist/docs/`.
 | File | Field |
 | --- | --- |
 | `package.json` | `.version` |
-| `pyproject.toml` | `project.version` |
+| `plugin/pyproject.toml` | `project.version` |
 | `.claude-plugin/plugin.json` | `.version` |
 | `.claude-plugin/marketplace.json` | `.plugins[0].version` |
 
@@ -208,10 +209,10 @@ grep -q '^CLAUDE_SMART_USE_LOCAL_EMBEDDING=' ~/.reflexio/.env 2>/dev/null \
 
 ### Step 4 — Start the reflexio backend
 
-Run from the **claude-smart repo root** (not the `reflexio/` subdir) so that `uv run` uses the claude-smart venv — which already has `chromadb` installed for the local embedder and `reflexio-ai` available as a path dep with the `reflexio` CLI script registered:
+Run from the `plugin/` directory (where `pyproject.toml` and `uv.lock` live) so that `uv run` uses the claude-smart venv — which already has `chromadb` installed for the local embedder and `reflexio-ai` available with the `reflexio` CLI script registered:
 
 ```bash
-uv run reflexio services start --only backend --no-reload
+cd plugin && uv run reflexio services start --only backend --no-reload
 ```
 
 Expected log lines:
@@ -249,7 +250,7 @@ JSON
 
 Put the same JSON into `~/.claude/settings.json`, using an absolute path for `path`.
 
-Restart Claude Code. Changes to `plugin/` are picked up on the next session; changes to `src/claude_smart/` are picked up on the next hook invocation (hooks shell out via `uv run`, so editing the Python package takes effect immediately without a restart).
+Restart Claude Code. Changes to `plugin/` are picked up on the next session; changes to `plugin/src/claude_smart/` are picked up on the next hook invocation (hooks shell out via `uv run`, so editing the Python package takes effect immediately without a restart).
 
 ### Step 6 — Sanity check
 
@@ -267,7 +268,7 @@ Useful when you're modifying the `install` subcommand itself and want to test wi
 
 ```bash
 # Python path
-uv run claude-smart install --source $PWD
+uv run --project plugin claude-smart install --source $PWD
 
 # Node path
 node bin/claude-smart.js install --source $PWD
@@ -278,7 +279,7 @@ Both accept either a GitHub `owner/repo` ref or an absolute path to a local dire
 ## Tests
 
 ```bash
-uv run pytest tests/ -q                    # claude-smart package tests
+uv run --project plugin pytest tests/ -q   # claude-smart package tests (from repo root)
 cd reflexio && uv run pytest tests/server/llm/ -q -o 'addopts='   # reflexio patch tests
 ```
 
@@ -290,5 +291,5 @@ Useful for debugging without a live Claude Code session:
 
 ```bash
 echo '{"session_id":"dev-1","source":"startup","cwd":"'"$PWD"'"}' \
-  | uv run python -m claude_smart.hook session-start
+  | uv run --project plugin python -m claude_smart.hook session-start
 ```

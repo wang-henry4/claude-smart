@@ -23,8 +23,8 @@ claude_smart_source_login_path
 CMD="${1:-start}"
 PORT=3001
 
-PROJECT_ROOT="$(cd "$HERE/../.." && pwd)"
-DASHBOARD_DIR="$PROJECT_ROOT/dashboard"
+PLUGIN_ROOT="$(cd "$HERE/.." && pwd)"
+DASHBOARD_DIR="$PLUGIN_ROOT/dashboard"
 
 STATE_DIR="$HOME/.claude-smart"
 PID_FILE="$STATE_DIR/dashboard.pid"

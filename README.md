@@ -6,16 +6,16 @@
   claude-smart
 </h1>
 
-<h4 align="center">A <a href="https://claude.com/claude-code" target="_blank">Claude Code</a> plugin that makes Claude Code self-improve — learning from your corrections, not just remembering them.</h4>
+<h4 align="center">The <a href="https://claude.com/claude-code" target="_blank">Claude Code</a> plugin that makes Claude Code self-improve as you use it — not by remembering past sessions, but by turning your corrections into rules it actually follows next time.</h4>
 
 <p align="center">
   <a href="LICENSE">
     <img src="https://img.shields.io/badge/License-Apache%202.0-blue.svg" alt="License">
   </a>
-  <a href="pyproject.toml">
-    <img src="https://img.shields.io/badge/version-0.1.2-green.svg" alt="Version">
+  <a href="plugin/pyproject.toml">
+    <img src="https://img.shields.io/badge/version-0.1.4-green.svg" alt="Version">
   </a>
-  <a href="pyproject.toml">
+  <a href="plugin/pyproject.toml">
     <img src="https://img.shields.io/badge/python-%3E%3D3.12-brightgreen.svg" alt="Python">
   </a>
   <a href="#quick-start">
@@ -34,19 +34,18 @@
 </p>
 
 <p align="center">
-  claude-smart turns your Claude Code corrections into durable rules that shape <i>future</i> sessions. Instead of replaying past observations as context, it distils them into a project playbook and per-session preferences — so Claude stops repeating the same mistakes and adapts to how your codebase actually wants to be written.
+  Every time you correct Claude Code, claude-smart turns that moment into a durable rule it follows from then on. No more re-explaining your stack, your conventions, or the same gotcha you flagged last week — Claude Code steadily adapts to how <i>your</i> codebase actually wants to be written, session after session.
 </p>
 
 <p align="center">
-  <b>Head-to-head benchmark vs <code>claude-mem</code>:</b> <b>2.00 vs 0.75</b> overall (0–3, higher is better), with <b>3.00 vs 0.00</b> on corrections and <b>3.00 vs 1.00</b> on future-facing rules —
-  see <a href="benchmarks/memory_comparison/EXPERIMENT.md">benchmarks/memory_comparison/EXPERIMENT.md</a> for methodology and full results.
+  <b>Head-to-head vs <code>claude-mem</code></b> (LLM-judged on how well each system's reinjected context matches the expected rule): claude-smart is <b>~2.7× more accurate overall</b>, <b>stops Claude from repeating mistakes you've already corrected</b> where claude-mem only recalls that they happened, and is <b>3× better at turning past events into future-facing rules</b> — see <a href="benchmarks/memory_comparison/EXPERIMENT.md">EXPERIMENT.md</a> for details.
 </p>
 
 ---
 
 ## Why Learning, Not Memory
 
-Plain memory solutions re-inject transcripts or summaries from prior sessions. That preserves continuity but has limits:
+Plain memory solutions re-inject transcripts or summaries from prior sessions — useful for continuity, but purely informative. claude-smart extracts *rules* from those sessions instead. Four ways that changes what Claude Code can do for you:
 
 - **Actionable, not just informative.** Memory logs *what happened*; learning produces *rules to follow* that change the next decision.
   > *e.g.* you told Claude to stop running `npm test` without `--run` because it hangs on watch mode. **Memory** recalls "user was annoyed about npm test hanging". **Learning** writes the rule *"always pass `--run` to `npm test` in this repo — default watch mode blocks CI"* and applies it next session.
@@ -84,8 +83,10 @@ Developing the plugin itself? See [DEVELOPER.md](./DEVELOPER.md#developing-local
 
 - 🧠 **Learn, don't just remember** — Corrections become structured, deduplicated rules, not transcript replays.
 - ⚡ **Fully automatic learning** — Every user turn, tool call, and assistant response is captured via lifecycle hooks and extracted into rules without you running anything.
+- 📈 **Compounds with every session** — Rules auto-merge, supersede, and archive as your project evolves — the playbook sharpens with use instead of bloating.
+  > *e.g.* you correct the same `npm test --run` gotcha twice → **claude-smart** consolidates them into one stronger rule. Later you switch the policy to `pnpm test` → the old rule is archived and the new one supersedes it, no manual cleanup.
 - 🎯 **Two-tier scope** — Per-session profiles for the current conversation; cross-session playbooks for the whole project.
-- 🔌 **Fully local — no external API call** — semantic search runs on an in-process ONNX embedder (all-MiniLM-L6-v2), and all data (profiles, playbooks, interaction buffers) is stored locally on your machine (`~/.reflexio/` and `~/.claude-smart/`). The whole stack works offline.
+- 🔌 **No external API call** — semantic search runs on an in-process ONNX embedder (all-MiniLM-L6-v2), and all data (profiles, playbooks, interaction buffers) is stored locally on your machine (`~/.reflexio/` and `~/.claude-smart/`).
 - 🔎 **Hybrid search** — Playbooks and profiles are indexed with vector + BM25 search for fast, robust retrieval.
 - 🧪 **Offline resilience** — If the reflexio backend is down, hooks buffer to disk; the next successful publish drains them.
 - 🧰 **Manual correction tag** — `/claude-smart:tag` flags the last turn as a correction so the extractor weights it heavily.
@@ -104,52 +105,44 @@ Developing the plugin itself? See [DEVELOPER.md](./DEVELOPER.md#developing-local
 
 ## Dashboard
 
-A Next.js web UI lives in [`dashboard/`](dashboard/) for browsing session buffers, inspecting user profiles, and editing project playbooks. It auto-starts alongside the backend — just open **http://localhost:3001**.
+A Next.js web UI lives in [`plugin/dashboard/`](plugin/dashboard/) for browsing session buffers, inspecting user profiles, and editing project playbooks. It auto-starts alongside the backend — just open **http://localhost:3001**.
 
 ---
 
 ## How It Works
 
-**Core components:**
+As you work, claude-smart builds two things and hands them back to Claude at the start of every new session:
 
-1. **5 lifecycle hooks** (`plugin/hooks/hooks.json`)
-   - `SessionStart` — fetches the project playbook from reflexio and injects it as `additionalContext`.
-   - `UserPromptSubmit` — buffers each user turn, heuristically flags corrections.
-   - `PostToolUse` — records tool invocations for later extraction.
-   - `Stop` — finalizes the assistant turn from the transcript, publishes to reflexio.
-   - `SessionEnd` — flushes the remaining buffer with `force_extraction=True`.
-2. **Local state buffer** — JSONL per session at `~/.claude-smart/sessions/{session_id}.jsonl`. Offline-safe.
-3. **Reflexio backend** (submodule at `reflexio/`) — SQLite storage, hybrid search, profile/playbook extraction, dedup, status lifecycle (`CURRENT` → `ARCHIVED`). Runs on `localhost:8081`.
-4. **Claude Code LLM provider** — a LiteLLM custom provider registered inside reflexio. Every generation call (extraction, update, dedup, evaluation) subprocesses `claude -p --output-format json`, so no OpenAI/Anthropic key is needed for the learning loop.
+### Your user profile — *who you are, this session*
 
-**Data flow:**
+A quick sketch of how you want to work right now — your stack, your role, small preferences you've dropped into the conversation. Scoped to the current session, so it doesn't follow you into unrelated projects.
 
-```
-Claude Code session
-  ├─ UserPromptSubmit ─┐
-  ├─ PostToolUse  ─────┤  → JSONL buffer ─→ Stop ─→ reflexio publish_interaction
-  └─ Stop         ─────┘                              │
-                                                      ▼
-                                        ┌─────────────────────────┐
-                                        │ reflexio extractors     │
-                                        │  (run via claude -p)    │
-                                        │  → profiles + playbooks │
-                                        └────────────┬────────────┘
-                                                     │
-                                                     ▼
-Next session → SessionStart → search_user_playbooks(agent_version=project_id)
-              → additionalContext injected into Claude's system prompt
-```
+> *Examples:*
+> - *Uses pnpm, not npm.*
+> - *Prefers terse answers, no trailing summaries.*
+> - *Backend engineer — explain frontend code with backend analogues.*
 
-**Mapping to reflexio:**
+### The project playbook — *durable rules, every session*
 
-| Reflexio field | claude-smart value |
-| --- | --- |
-| `user_id` | Claude Code `session_id` — scopes profiles to the current conversation |
-| `agent_version` | `project_id` (git-toplevel basename) — stable across sessions, so playbooks accumulate project-wide |
-| `session_id` | Claude Code `session_id` — for reflexio's deferred success evaluation |
+A growing list of **rules for this project**, pulled from every session you've ever run in it. Each rule says when it applies and why it exists.
 
-Cross-session playbook retrieval uses `search_user_playbooks(agent_version=project_id, user_id=None)` — playbooks written from any prior session in this project surface for every future session.
+> *Examples:*
+> - *Always pass `--run` to `npm test` — default watch mode hangs CI.*
+> - *Use a real Postgres for integration tests, not mocks — mocks once hid a broken migration.*
+> - *Prefer ESM-native test runners in this monorepo.*
+
+Rules clean themselves up: correct the same thing twice and they merge; change your mind later and the old one is archived.
+
+### How it runs
+
+1. You have a normal Claude Code session.
+2. claude-smart quietly watches your turns, tool calls, and Claude's replies — flagging corrections automatically (or anything you `/tag`).
+3. When the session ends (or you run `/learn`), it turns what happened into profile entries and playbook rules.
+4. Next session, both get injected into Claude's system prompt. Run `/show` any time to see what Claude is being told.
+
+No chat, no prompts to rewrite, no config files to groom. Everything runs on your machine.
+
+See [ARCHITECTURE.md](./ARCHITECTURE.md) for the hooks, data flow, and reflexio details.
 
 ---
 
@@ -197,7 +190,7 @@ If you still want to use a cloud embedding provider (OpenAI, Gemini, etc.), omit
 Extraction is async by default. Run `/learn` to force it, wait ~20–30s, then run `/show` — no new session needed. `/show` shows whether the rule was actually extracted.
 
 **Reflexio refuses to boot with "no embedding-capable provider".**
-Check that `CLAUDE_SMART_USE_LOCAL_EMBEDDING=1` is in `~/.reflexio/.env` *and* that `chromadb` is installed in the venv (`uv run python -c "import chromadb"` should print nothing). If you'd rather use a cloud embedder instead, drop the env flag and set `OPENAI_API_KEY` or `GEMINI_API_KEY` in the same file.
+Check that `CLAUDE_SMART_USE_LOCAL_EMBEDDING=1` is in `~/.reflexio/.env` *and* that `chromadb` is installed in the venv (`uv run --project plugin python -c "import chromadb"` should print nothing). If you'd rather use a cloud embedder instead, drop the env flag and set `OPENAI_API_KEY` or `GEMINI_API_KEY` in the same file.
 
 **`claude-smart` doesn't see my interactions.**
 Check `~/.claude-smart/sessions/`. If your current session's JSONL has no `User`/`Assistant` rows, the plugin isn't receiving hook events — verify `.claude/settings.local.json` has the right path and that `enabledPlugins` is `true`.
