@@ -6,7 +6,7 @@
   claude-smart
 </h1>
 
-<h4 align="center">Self-improving <a href="https://claude.com/claude-code" target="_blank">Claude Code</a> plugin — learns from your corrections, not just remembers them.</h4>
+<h4 align="center">A <a href="https://claude.com/claude-code" target="_blank">Claude Code</a> plugin that makes Claude Code self-improve — learning from your corrections, not just remembering them.</h4>
 
 <p align="center">
   <a href="LICENSE">
@@ -35,6 +35,11 @@
 
 <p align="center">
   claude-smart turns your Claude Code corrections into durable rules that shape <i>future</i> sessions. Instead of replaying past observations as context, it distils them into a project playbook and per-session preferences — so Claude stops repeating the same mistakes and adapts to how your codebase actually wants to be written.
+</p>
+
+<p align="center">
+  <b>Head-to-head benchmark vs <code>claude-mem</code>:</b> <b>2.00 vs 0.75</b> overall (0–3, higher is better), with <b>3.00 vs 0.00</b> on corrections and <b>3.00 vs 1.00</b> on future-facing rules —
+  see <a href="benchmarks/memory_comparison/EXPERIMENT.md">benchmarks/memory_comparison/EXPERIMENT.md</a> for methodology and full results.
 </p>
 
 ---
