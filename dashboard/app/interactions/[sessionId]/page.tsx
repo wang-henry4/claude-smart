@@ -2,7 +2,7 @@
 
 import { use, useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Wrench, AlertTriangle } from "lucide-react";
+import { ArrowLeft, Wrench, AlertTriangle, ChevronRight } from "lucide-react";
 import { PageHeader } from "@/components/common/page-header";
 import { EmptyState } from "@/components/common/empty-state";
 import { Badge } from "@/components/ui/badge";
@@ -101,16 +101,41 @@ export default function InteractionDetailPage({
                       )}
                       {turn.tools_used && turn.tools_used.length > 0 && (
                         <div className="flex items-center gap-1 flex-wrap">
-                          {turn.tools_used.map((t, ti) => (
-                            <Badge
-                              key={ti}
-                              variant="outline"
-                              className="h-5 gap-1 text-[10px]"
-                            >
-                              <Wrench className="h-3 w-3" />
-                              {t.tool_name}
-                            </Badge>
-                          ))}
+                          {turn.tools_used.map((t, ti) => {
+                            const input = t.tool_data?.input;
+                            const hasInput =
+                              input && Object.keys(input).length > 0;
+                            if (!hasInput) {
+                              return (
+                                <span key={ti}>
+                                  <Badge
+                                    variant="outline"
+                                    className="h-5 gap-1 text-[10px]"
+                                  >
+                                    <Wrench className="h-3 w-3" />
+                                    {t.tool_name}
+                                  </Badge>
+                                </span>
+                              );
+                            }
+                            return (
+                              <details key={ti} className="group">
+                                <summary className="cursor-pointer list-none">
+                                  <Badge
+                                    variant="outline"
+                                    className="h-5 gap-1 text-[10px]"
+                                  >
+                                    <Wrench className="h-3 w-3" />
+                                    {t.tool_name}
+                                    <ChevronRight className="h-3 w-3 transition-transform group-open:rotate-90" />
+                                  </Badge>
+                                </summary>
+                                <pre className="mt-1 whitespace-pre-wrap break-words rounded-md border border-border bg-muted/40 px-2 py-1 text-[10px] font-mono text-muted-foreground">
+                                  {JSON.stringify(input, null, 2)}
+                                </pre>
+                              </details>
+                            );
+                          })}
                         </div>
                       )}
                     </div>

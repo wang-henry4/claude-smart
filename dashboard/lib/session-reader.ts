@@ -27,6 +27,7 @@ type RawRecord = {
   content?: string;
   ts?: number;
   tool_name?: string;
+  tool_input?: Record<string, unknown>;
   status?: string;
   user_action?: UserActionType;
   user_action_description?: string;
@@ -69,10 +70,14 @@ function foldTurns(records: RawRecord[]): {
     }
     const role = rec.role;
     if (role === "Assistant_tool") {
-      pendingTools.push({
+      const entry: ToolUsed = {
         tool_name: rec.tool_name ?? "",
         status: rec.status ?? "success",
-      });
+      };
+      if (rec.tool_input && Object.keys(rec.tool_input).length > 0) {
+        entry.tool_data = { input: rec.tool_input };
+      }
+      pendingTools.push(entry);
       continue;
     }
     if (role !== "User" && role !== "Assistant") continue;

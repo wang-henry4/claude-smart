@@ -221,3 +221,64 @@ def test_fetch_project_playbooks_default_top_k_is_tightened() -> None:
     a = _adapter_with(client)
     a.fetch_project_playbooks("proj")
     assert client.playbook_kwargs["top_k"] == 10
+
+
+# -----------------------------------------------------------------------------
+# apply_batch_defaults — push claude-smart's preferred cadence to reflexio
+# -----------------------------------------------------------------------------
+
+
+class _ConfigClient:
+    """Captures get_config/set_config calls against a mutable config object."""
+
+    def __init__(self, *, batch_size: int, batch_interval: int, get_raises=None):
+        self._config = SimpleNamespace(
+            batch_size=batch_size, batch_interval=batch_interval
+        )
+        self._get_raises = get_raises
+        self.set_calls: list[SimpleNamespace] = []
+
+    def get_config(self):
+        if self._get_raises is not None:
+            raise self._get_raises
+        return self._config
+
+    def set_config(self, config):
+        self.set_calls.append(
+            SimpleNamespace(
+                batch_size=config.batch_size, batch_interval=config.batch_interval
+            )
+        )
+        self._config = config
+        return {"ok": True}
+
+
+def test_apply_batch_defaults_writes_when_values_differ() -> None:
+    client = _ConfigClient(batch_size=10, batch_interval=5)
+    a = _adapter_with(client)
+    assert a.apply_batch_defaults(batch_size=5, batch_interval=3) is True
+    assert len(client.set_calls) == 1
+    assert client.set_calls[0].batch_size == 5
+    assert client.set_calls[0].batch_interval == 3
+
+
+def test_apply_batch_defaults_skips_set_when_values_match() -> None:
+    client = _ConfigClient(batch_size=5, batch_interval=3)
+    a = _adapter_with(client)
+    assert a.apply_batch_defaults(batch_size=5, batch_interval=3) is True
+    assert client.set_calls == []
+
+
+def test_apply_batch_defaults_returns_false_when_client_unavailable(
+    monkeypatch,
+) -> None:
+    a = reflexio_adapter.Adapter()
+    monkeypatch.setattr(a, "_get_client", lambda: None)
+    assert a.apply_batch_defaults(batch_size=5, batch_interval=3) is False
+
+
+def test_apply_batch_defaults_absorbs_get_config_errors() -> None:
+    a = _adapter_with(
+        _ConfigClient(batch_size=10, batch_interval=5, get_raises=RuntimeError("down"))
+    )
+    assert a.apply_batch_defaults(batch_size=5, batch_interval=3) is False

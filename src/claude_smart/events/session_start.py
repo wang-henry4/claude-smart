@@ -9,6 +9,12 @@ from typing import Any
 from claude_smart import context_format, hook, ids
 from claude_smart.reflexio_adapter import Adapter
 
+# Claude-smart's preferred extraction cadence — more frequent, smaller batches
+# than reflexio's out-of-box 10/5. Applied idempotently to the reflexio server
+# on every SessionStart via Adapter.apply_batch_defaults.
+_CLAUDE_SMART_BATCH_SIZE = 5
+_CLAUDE_SMART_BATCH_INTERVAL = 3
+
 
 def handle(payload: dict[str, Any]) -> None:
     session_id = payload.get("session_id")
@@ -18,7 +24,12 @@ def handle(payload: dict[str, Any]) -> None:
         return
 
     project_id = ids.resolve_project_id(cwd)
-    playbooks, profiles = Adapter().fetch_both(
+    adapter = Adapter()
+    adapter.apply_batch_defaults(
+        batch_size=_CLAUDE_SMART_BATCH_SIZE,
+        batch_interval=_CLAUDE_SMART_BATCH_INTERVAL,
+    )
+    playbooks, profiles = adapter.fetch_both(
         project_id=project_id,
         session_id=session_id,
     )

@@ -109,12 +109,14 @@ def unpublished_slice(
             continue
         role = rec.get("role")
         if role == "Assistant_tool":
-            pending_tools.append(
-                {
-                    "tool_name": rec.get("tool_name", ""),
-                    "status": rec.get("status", "success"),
-                }
-            )
+            tool_input = rec.get("tool_input") or {}
+            tool_entry: dict[str, Any] = {
+                "tool_name": rec.get("tool_name", ""),
+                "status": rec.get("status", "success"),
+            }
+            if tool_input:
+                tool_entry["tool_data"] = {"input": tool_input}
+            pending_tools.append(tool_entry)
             continue
         if role in {"User", "Assistant"}:
             turn = {k: v for k, v in rec.items() if k not in {"role", "ts"}}

@@ -23,6 +23,14 @@ build-backend = "hatchling.build"
 [tool.hatch.build.targets.wheel]
 packages = ["src/claude_smart"]
 
+[tool.hatch.build.targets.sdist]
+include = [
+    "src/claude_smart",
+    "README.md",
+    "LICENSE",
+    "pyproject.toml",
+]
+
 [tool.uv.sources]
 reflexio-ai = { path = "./reflexio", editable = true }
 

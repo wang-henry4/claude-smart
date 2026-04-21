@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { originOnly } from "@/lib/reflexio-url";
 
 export const dynamic = "force-dynamic";
 
@@ -6,8 +7,10 @@ const DEFAULT_URL = "http://localhost:8081";
 
 function reflexioBase(req: Request): string {
   const header = req.headers.get("x-reflexio-url");
-  if (header) return header.replace(/\/$/, "");
-  return (process.env.REFLEXIO_URL ?? DEFAULT_URL).replace(/\/$/, "");
+  const fromHeader = header ? originOnly(header) : null;
+  if (fromHeader) return fromHeader;
+  const fromEnv = originOnly(process.env.REFLEXIO_URL ?? "");
+  return fromEnv ?? DEFAULT_URL;
 }
 
 async function proxy(

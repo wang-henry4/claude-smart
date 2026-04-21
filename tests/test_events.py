@@ -46,6 +46,65 @@ def test_post_tool_drops_payload_without_session_or_tool(session_dir) -> None:
     assert state.read_all("s1") == []
 
 
+def test_post_tool_records_tool_input(session_dir) -> None:
+    post_tool.handle(
+        {
+            "session_id": "s1",
+            "tool_name": "Bash",
+            "tool_input": {"command": "ls -la"},
+            "tool_response": {"ok": True},
+        }
+    )
+    post_tool.handle(
+        {
+            "session_id": "s1",
+            "tool_name": "Read",
+            "tool_response": "plain",
+        }
+    )
+    records = state.read_all("s1")
+    assert records[0]["tool_input"] == {"command": "ls -la"}
+    assert records[1]["tool_input"] == {}
+
+
+def test_post_tool_redacts_secret_assignments(session_dir) -> None:
+    """High-entropy KEY=VALUE secrets are masked; benign assignments survive."""
+    post_tool.handle(
+        {
+            "session_id": "s1",
+            "tool_name": "Bash",
+            "tool_input": {
+                "command": (
+                    'AWS_SECRET_ACCESS_KEY="wJalrXUtnFEMI0abcdEXAMPLEkey123" '
+                    "LOG_LEVEL=INFO curl -sf https://example.com"
+                ),
+            },
+        }
+    )
+    records = state.read_all("s1")
+    command = records[0]["tool_input"]["command"]
+    assert "wJalrXUtnFEMI0abcdEXAMPLEkey123" not in command
+    assert "<redacted:" in command
+    # Benign lowercase-or-short assignments should pass through unchanged.
+    assert "LOG_LEVEL=INFO" in command
+
+
+def test_post_tool_truncates_oversized_string(session_dir) -> None:
+    blob = "x" * 5000
+    post_tool.handle(
+        {
+            "session_id": "s1",
+            "tool_name": "Write",
+            "tool_input": {"file_path": "/tmp/huge", "content": blob},
+        }
+    )
+    stored = state.read_all("s1")[0]["tool_input"]["content"]
+    assert stored.endswith("…(truncated)")
+    assert len(stored) < len(blob)
+    # file_path is short and must not be affected.
+    assert state.read_all("s1")[0]["tool_input"]["file_path"] == "/tmp/huge"
+
+
 # -----------------------------------------------------------------------------
 # stop — always appends an Assistant record (Option A)
 # -----------------------------------------------------------------------------
@@ -86,6 +145,97 @@ def test_stop_appends_assistant_text_from_transcript(
         "content": "hello there",
         "ts": records[-1]["ts"],
     }
+
+
+def test_stop_concatenates_text_across_multi_entry_assistant_turn(
+    session_dir, tmp_path, monkeypatch
+) -> None:
+    """A turn spans many transcript entries; all text blocks must be captured.
+
+    Claude Code's JSONL writes each thinking/tool_use/text block as its own
+    ``type: assistant`` entry. Tool results arrive as ``type: user`` entries
+    holding ``tool_result`` blocks — they must not be treated as a turn
+    boundary. Only the leading real user message bounds the collection.
+    """
+    transcript = _write_transcript(
+        tmp_path,
+        [
+            {"type": "user", "message": {"content": "do the thing"}},
+            {
+                "type": "assistant",
+                "message": {"content": [{"type": "thinking", "text": "hmm"}]},
+            },
+            {
+                "type": "assistant",
+                "message": {"content": [{"type": "text", "text": "Let me check."}]},
+            },
+            {
+                "type": "assistant",
+                "message": {"content": [{"type": "tool_use", "name": "Read"}]},
+            },
+            {
+                "type": "user",
+                "message": {"content": [{"type": "tool_result", "content": "..."}]},
+            },
+            {
+                "type": "assistant",
+                "message": {"content": [{"type": "text", "text": "Found it."}]},
+            },
+            {
+                "type": "assistant",
+                "message": {"content": [{"type": "tool_use", "name": "Edit"}]},
+            },
+            {
+                "type": "user",
+                "message": {"content": [{"type": "tool_result", "content": "ok"}]},
+            },
+            {
+                "type": "assistant",
+                "message": {"content": [{"type": "text", "text": "Done."}]},
+            },
+        ],
+    )
+    monkeypatch.setattr(
+        "claude_smart.publish.publish_unpublished",
+        lambda **_: ("nothing", 0),
+    )
+    stop.handle({"session_id": "s1", "transcript_path": str(transcript)})
+    records = state.read_all("s1")
+    assert records[-1]["role"] == "Assistant"
+    assert records[-1]["content"] == "Let me check.\n\nFound it.\n\nDone."
+
+
+def test_stop_does_not_cross_prior_turn_boundary(
+    session_dir, tmp_path, monkeypatch
+) -> None:
+    """Backward walk must stop at the user message that opened THIS turn.
+
+    Regression guard: earlier assistant text must NOT leak into the
+    current Assistant record, or prior-turn content would get republished
+    to reflexio every time the Stop hook fires.
+    """
+    transcript = _write_transcript(
+        tmp_path,
+        [
+            {"type": "user", "message": {"content": "first question"}},
+            {
+                "type": "assistant",
+                "message": {"content": [{"type": "text", "text": "First answer."}]},
+            },
+            {"type": "user", "message": {"content": "follow-up"}},
+            {
+                "type": "assistant",
+                "message": {"content": [{"type": "text", "text": "Second answer."}]},
+            },
+        ],
+    )
+    monkeypatch.setattr(
+        "claude_smart.publish.publish_unpublished",
+        lambda **_: ("nothing", 0),
+    )
+    stop.handle({"session_id": "s1", "transcript_path": str(transcript)})
+    records = state.read_all("s1")
+    assert records[-1]["content"] == "Second answer."
 
 
 def test_stop_appends_empty_assistant_record_when_turn_was_tools_only(
@@ -136,6 +286,9 @@ def test_session_start_emits_continue_when_no_playbook_or_profile(
     session_dir, monkeypatch
 ) -> None:
     class StubAdapter:
+        def apply_batch_defaults(self, **_kw):
+            return True
+
         def fetch_both(self, **_kw):
             return ([], [])
 
@@ -155,6 +308,9 @@ def test_session_start_emits_additional_context_when_playbook_present(
     session_dir, monkeypatch
 ) -> None:
     class Stub:
+        def apply_batch_defaults(self, **_kw):
+            return True
+
         def fetch_both(self, **_kw):
             return (
                 [
@@ -182,11 +338,41 @@ def test_session_start_emits_additional_context_when_playbook_present(
     assert "use pathlib" in payload["hookSpecificOutput"]["additionalContext"]
 
 
+def test_session_start_applies_claude_smart_batch_defaults(
+    session_dir, monkeypatch
+) -> None:
+    """SessionStart must push claude-smart's 5/3 batch defaults to reflexio."""
+    applied: list[dict[str, Any]] = []
+
+    class Stub:
+        def apply_batch_defaults(self, **kwargs):
+            applied.append(kwargs)
+            return True
+
+        def fetch_both(self, **_kw):
+            return ([], [])
+
+    monkeypatch.setattr(
+        "claude_smart.events.session_start.Adapter", lambda *a, **kw: Stub()
+    )
+    monkeypatch.setattr(
+        "claude_smart.events.session_start.ids.resolve_project_id",
+        lambda *_a, **_kw: "demo",
+    )
+    buf = io.StringIO()
+    monkeypatch.setattr(sys, "stdout", buf)
+    session_start.handle({"session_id": "s1", "source": "startup"})
+    assert applied == [{"batch_size": 5, "batch_interval": 3}]
+
+
 def test_session_start_fetches_both_on_every_source(session_dir, monkeypatch) -> None:
     """Used to skip profile fetch unless source ∈ {resume,clear,compact}; now always both."""
     calls: list[dict[str, Any]] = []
 
     class Stub:
+        def apply_batch_defaults(self, **_kw):
+            return True
+
         def fetch_both(self, **kwargs):
             calls.append(kwargs)
             return ([], [])

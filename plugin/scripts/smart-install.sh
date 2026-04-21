@@ -9,6 +9,10 @@
 set -eu
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
+# shellcheck source=_lib.sh
+. "$HERE/_lib.sh"
+claude_smart_source_login_path
+
 PROJECT_ROOT="$(cd "$HERE/../.." && pwd)"
 
 MARKER_DIR="$HOME/.claude-smart"
@@ -56,6 +60,33 @@ fi
 
 if ! command -v claude >/dev/null 2>&1; then
   echo "[claude-smart] WARNING: 'claude' CLI not on PATH — reflexio extractors will have no LLM until it's installed" >&2
+fi
+
+# Pre-install + build the Next.js dashboard so SessionStart can boot it
+# without the multi-minute first-run cost. dashboard-service.sh will retry
+# the build lazily if either step is skipped or fails here.
+DASHBOARD_DIR="$PROJECT_ROOT/dashboard"
+if [ -d "$DASHBOARD_DIR" ]; then
+  if command -v npm >/dev/null 2>&1; then
+    echo "[claude-smart] installing dashboard dependencies..." >&2
+    if (cd "$DASHBOARD_DIR" && npm install --silent --no-fund --no-audit >&2); then
+      echo "[claude-smart] building dashboard..." >&2
+      # Trap INT/TERM so a killed build (e.g., Setup hit a hook timeout)
+      # doesn't leave a partial .next that dashboard-service.sh can't
+      # detect as broken. The trap runs in the current shell; unset it
+      # once the build step returns.
+      trap 'rm -rf "$DASHBOARD_DIR/.next"; exit 130' INT TERM
+      if ! (cd "$DASHBOARD_DIR" && npm run build >&2); then
+        rm -rf "$DASHBOARD_DIR/.next"
+        echo "[claude-smart] WARNING: dashboard build failed; rerun plugin Setup to retry" >&2
+      fi
+      trap - INT TERM
+    else
+      echo "[claude-smart] WARNING: dashboard npm install failed; dashboard will be unavailable" >&2
+    fi
+  else
+    echo "[claude-smart] WARNING: npm not on PATH — dashboard will be unavailable" >&2
+  fi
 fi
 
 echo "[claude-smart] install complete. Start reflexio with: uv run reflexio services start" >&2

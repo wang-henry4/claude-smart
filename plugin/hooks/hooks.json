@@ -21,6 +21,11 @@
             "type": "command",
             "command": "_R=\"${CLAUDE_PLUGIN_ROOT}\"; [ -z \"$_R\" ] && _R=\"$HOME/.claude/plugins/marketplaces/yilu/plugin\"; bash \"$_R/scripts/hook_entry.sh\" session-start",
             "timeout": 30
+          },
+          {
+            "type": "command",
+            "command": "_R=\"${CLAUDE_PLUGIN_ROOT}\"; [ -z \"$_R\" ] && _R=\"$HOME/.claude/plugins/marketplaces/yilu/plugin\"; bash \"$_R/scripts/dashboard-service.sh\" start",
+            "timeout": 10
           }
         ]
       }
@@ -78,6 +83,11 @@
             "type": "command",
             "command": "_R=\"${CLAUDE_PLUGIN_ROOT}\"; [ -z \"$_R\" ] && _R=\"$HOME/.claude/plugins/marketplaces/yilu/plugin\"; bash \"$_R/scripts/hook_entry.sh\" session-end",
             "timeout": 60
+          },
+          {
+            "type": "command",
+            "command": "_R=\"${CLAUDE_PLUGIN_ROOT}\"; [ -z \"$_R\" ] && _R=\"$HOME/.claude/plugins/marketplaces/yilu/plugin\"; bash \"$_R/scripts/dashboard-service.sh\" session-end",
+            "timeout": 10
           }
         ]
       }

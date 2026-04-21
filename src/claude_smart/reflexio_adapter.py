@@ -86,6 +86,47 @@ class Adapter:
             _LOGGER.warning("publish_interaction failed: %s", exc)
             return False
 
+    def apply_batch_defaults(self, *, batch_size: int, batch_interval: int) -> bool:
+        """Push claude-smart's preferred batch defaults to the reflexio server.
+
+        Reads the current ``Config`` and only issues a ``set_config`` when the
+        server-side values differ, so steady state is a single cheap GET.
+
+        Reflexio persists ``Config`` to disk, so once these values land they
+        survive backend restarts. The flip side: if an operator customizes
+        ``batch_size``/``batch_interval`` via the dashboard, this call will
+        overwrite those values back to the claude-smart defaults on the next
+        SessionStart. To change the defaults, edit the constants at the call
+        site in ``events/session_start.py``.
+
+        Args:
+            batch_size (int): Desired ``Config.batch_size`` on the server.
+            batch_interval (int): Desired ``Config.batch_interval`` on the
+                server. Must be ``<= batch_size`` (reflexio enforces this).
+
+        Returns:
+            bool: True if the server is already at the target values or the
+                write succeeded; False if reflexio is unreachable or the call
+                raised.
+        """
+        client = self._get_client()
+        if client is None:
+            return False
+        try:
+            config = client.get_config()
+            if (
+                getattr(config, "batch_size", None) == batch_size
+                and getattr(config, "batch_interval", None) == batch_interval
+            ):
+                return True
+            config.batch_size = batch_size
+            config.batch_interval = batch_interval
+            client.set_config(config)
+            return True
+        except Exception as exc:  # noqa: BLE001 — adapter must never raise.
+            _LOGGER.warning("apply_batch_defaults failed: %s", exc)
+            return False
+
     # -----------------------------------------------------------------
     # Reads (used by SessionStart)
     # -----------------------------------------------------------------

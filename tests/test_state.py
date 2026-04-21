@@ -46,15 +46,46 @@ def test_unpublished_slice_respects_watermark() -> None:
 def test_unpublished_slice_attaches_tools_to_next_assistant() -> None:
     records = [
         {"role": "User", "content": "u1"},
-        {"role": "Assistant_tool", "tool_name": "Bash", "status": "success"},
-        {"role": "Assistant_tool", "tool_name": "Read", "status": "error"},
+        {
+            "role": "Assistant_tool",
+            "tool_name": "Bash",
+            "tool_input": {"command": "ls"},
+            "status": "success",
+        },
+        {
+            "role": "Assistant_tool",
+            "tool_name": "Read",
+            "tool_input": {"file_path": "/tmp/x"},
+            "status": "error",
+        },
         {"role": "Assistant", "content": "a1"},
     ]
     _, turns = state.unpublished_slice(records)
     assert turns[-1]["role"] == "Assistant"
     assert turns[-1]["tools_used"] == [
+        {
+            "tool_name": "Bash",
+            "status": "success",
+            "tool_data": {"input": {"command": "ls"}},
+        },
+        {
+            "tool_name": "Read",
+            "status": "error",
+            "tool_data": {"input": {"file_path": "/tmp/x"}},
+        },
+    ]
+
+
+def test_unpublished_slice_omits_tool_data_when_input_missing() -> None:
+    """Legacy records without ``tool_input`` still publish, without a tool_data key."""
+    records = [
+        {"role": "User", "content": "u1"},
+        {"role": "Assistant_tool", "tool_name": "Bash", "status": "success"},
+        {"role": "Assistant", "content": "a1"},
+    ]
+    _, turns = state.unpublished_slice(records)
+    assert turns[-1]["tools_used"] == [
         {"tool_name": "Bash", "status": "success"},
-        {"tool_name": "Read", "status": "error"},
     ]
 
 
@@ -62,19 +93,41 @@ def test_unpublished_slice_silent_assistant_placeholder_pins_tools() -> None:
     """Option A: an empty-content Assistant record still owns its tool runs."""
     records = [
         {"role": "User", "content": "u1"},
-        {"role": "Assistant_tool", "tool_name": "Bash", "status": "success"},
+        {
+            "role": "Assistant_tool",
+            "tool_name": "Bash",
+            "tool_input": {"command": "ls"},
+            "status": "success",
+        },
         {"role": "Assistant", "content": ""},  # Stop-hook placeholder
         {"role": "User", "content": "u2"},
-        {"role": "Assistant_tool", "tool_name": "Edit", "status": "success"},
+        {
+            "role": "Assistant_tool",
+            "tool_name": "Edit",
+            "tool_input": {"file_path": "/a"},
+            "status": "success",
+        },
         {"role": "Assistant", "content": "done"},
     ]
     _, turns = state.unpublished_slice(records)
     assert turns[0] == {"role": "User", "content": "u1"}
     assert turns[1]["role"] == "Assistant"
     assert turns[1]["content"] == ""
-    assert [t["tool_name"] for t in turns[1]["tools_used"]] == ["Bash"]
+    assert turns[1]["tools_used"] == [
+        {
+            "tool_name": "Bash",
+            "status": "success",
+            "tool_data": {"input": {"command": "ls"}},
+        },
+    ]
     assert turns[2] == {"role": "User", "content": "u2"}
-    assert [t["tool_name"] for t in turns[3]["tools_used"]] == ["Edit"]
+    assert turns[3]["tools_used"] == [
+        {
+            "tool_name": "Edit",
+            "status": "success",
+            "tool_data": {"input": {"file_path": "/a"}},
+        },
+    ]
 
 
 def _append_worker(state_dir: str, session_id: str, payload: str) -> None:
