@@ -14,6 +14,12 @@ from claude_smart import internal_call
 from claude_smart.internal_call import is_internal_invocation
 
 
+@pytest.fixture(autouse=True)
+def _clear_entrypoint(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Strip ``CLAUDE_CODE_ENTRYPOINT`` so individual tests opt in explicitly."""
+    monkeypatch.delenv("CLAUDE_CODE_ENTRYPOINT", raising=False)
+
+
 def test_returns_true_when_env_marker_set(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("CLAUDE_SMART_INTERNAL", "1")
     assert is_internal_invocation({}) is True
@@ -70,4 +76,20 @@ def test_env_marker_other_values_do_not_trigger(
     monkeypatch.setenv("CLAUDE_SMART_INTERNAL", "0")
     assert is_internal_invocation({}) is False
     monkeypatch.setenv("CLAUDE_SMART_INTERNAL", "true")
+    assert is_internal_invocation({}) is False
+
+
+def test_returns_true_for_headless_entrypoint(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("CLAUDE_SMART_INTERNAL", raising=False)
+    monkeypatch.setenv("CLAUDE_CODE_ENTRYPOINT", "sdk-cli")
+    assert is_internal_invocation({}) is True
+
+
+def test_returns_false_for_interactive_entrypoint(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("CLAUDE_SMART_INTERNAL", raising=False)
+    monkeypatch.setenv("CLAUDE_CODE_ENTRYPOINT", "cli")
     assert is_internal_invocation({}) is False

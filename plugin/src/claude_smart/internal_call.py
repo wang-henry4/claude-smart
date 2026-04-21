@@ -1,21 +1,34 @@
-"""Detect hook invocations that come from reflexio calling itself.
+"""Detect hook invocations that should not be published to reflexio.
 
-The ``claude-code`` LiteLLM provider (see
-``reflexio.server.llm.providers.claude_code_provider._run_cli``) shells
-out to the ``claude`` CLI to answer extractor prompts. That subprocess
-is a full Claude Code invocation, so it fires *our* hooks too — and
-without a guard, the Stop hook publishes the extractor's own system
-prompt (``"You are a detector for AGENT LEARNING SIGNALS..."``) back
-into reflexio as a user interaction. Reflexio then trains on its own
-internals.
+Two distinct sources of unwanted hook fires:
 
-Two detection signals, OR'd:
-  - Env var ``CLAUDE_SMART_INTERNAL=1``, set by the provider before
-    spawning ``claude`` — propagates to all hook scripts spawned by
-    that child. This is the primary, reliable signal.
+1. **Reflexio's own LLM provider.** The ``claude-code`` LiteLLM provider
+   (see ``reflexio.server.llm.providers.claude_code_provider._run_cli``)
+   shells out to the ``claude`` CLI to answer extractor prompts. That
+   subprocess is a full Claude Code invocation, so it fires *our* hooks
+   too — and without a guard, the Stop hook publishes the extractor's
+   own system prompt back into reflexio as a user interaction.
+   Reflexio then trains on its own internals.
+
+2. **Other tools' headless ``claude -p`` subprocesses.** Third-party
+   plugins (e.g. claude-mem) spawn their own ``claude -p`` sessions
+   for memory/observation extraction. Those sessions also fire the
+   user's globally-installed claude-smart hooks, and the system prompt
+   passed to ``-p`` shows up in the transcript as a user message —
+   leaking text like ``"You are a Claude-Mem, a specialized observer
+   tool..."`` into reflexio as a fake user interaction.
+
+Detection signals, OR'd:
+  - ``CLAUDE_CODE_ENTRYPOINT`` is anything other than ``"cli"`` —
+    the interactive REPL sets ``cli``; headless ``claude -p`` sets
+    ``sdk-cli`` (and the SDKs may set other values). This catches
+    case (2) for any third-party tool, not just claude-mem.
+  - Env var ``CLAUDE_SMART_INTERNAL=1``, set by reflexio's provider
+    before spawning ``claude``. Belt-and-suspenders for case (1) in
+    case the entrypoint check ever misses a future SDK variant.
   - ``payload.cwd`` resolves inside the reflexio submodule. Catches
-    direct invocations of ``claude`` from inside reflexio (manual
-    debugging, future internal callers) that forget to set the env.
+    direct interactive ``claude`` runs from inside reflexio (manual
+    debugging) that would otherwise pollute the corpus.
 """
 
 from __future__ import annotations
@@ -25,6 +38,8 @@ from pathlib import Path
 from typing import Any
 
 _ENV_MARKER = "CLAUDE_SMART_INTERNAL"
+_ENTRYPOINT_VAR = "CLAUDE_CODE_ENTRYPOINT"
+_INTERACTIVE_ENTRYPOINT = "cli"
 
 # Reflexio submodule lives at <repo>/reflexio when this package runs from
 # a dev checkout (<repo>/plugin/src/claude_smart/internal_call.py); anchor
@@ -55,6 +70,9 @@ def is_internal_invocation(payload: dict[str, Any]) -> bool:
             ``cwd`` is missing or unresolvable.
     """
     if os.environ.get(_ENV_MARKER) == "1":
+        return True
+    entrypoint = os.environ.get(_ENTRYPOINT_VAR)
+    if entrypoint and entrypoint != _INTERACTIVE_ENTRYPOINT:
         return True
     cwd = payload.get("cwd")
     if not isinstance(cwd, str) or not cwd:
