@@ -26,7 +26,7 @@ from claude_smart.reflexio_adapter import Adapter
 
 _REFLEXIO_ENV_PATH = Path.home() / ".reflexio" / ".env"
 _DEFAULT_MARKETPLACE_SOURCE = "ReflexioAI/claude-smart"
-_PLUGIN_SPEC = "claude-smart@yilu"
+_PLUGIN_SPEC = "claude-smart@reflexioai"
 
 
 def _latest_session_id() -> str | None:

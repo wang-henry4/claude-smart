@@ -152,7 +152,7 @@ The `[tool.uv.sources]` override in `pyproject.toml` points `reflexio-ai` to a l
 1. Publish `reflexio-ai` to PyPI first, then remove the `[tool.uv.sources]` block before `make release`, or
 2. Drop `reflexio-ai` from the published package's `dependencies` and keep the install-time bootstrap (`plugin/scripts/smart-install.sh`) responsible for installing it inside the Claude Code plugin directory.
 
-See the "One-command install" section of the README for the install flow that assumes option 2.
+See README's "Step 1 — Install the plugin" section for the install flow that assumes option 2.
 
 **`make release` committed and tagged but `npm publish` failed after.**
 `publish` runs before `git push --follow-tags`, so nothing was pushed. Fix the cause (auth, network, registry), then:
@@ -172,36 +172,108 @@ A sed failure mid-run can leave `*.bak` siblings. Safe to delete:
 rm -f package.json.bak pyproject.toml.bak .claude-plugin/*.bak
 ```
 
-## Local testing without publishing
+## Developing locally
 
-Install the plugin from a local directory so you don't need a GitHub push cycle:
+For iterating on claude-smart itself — editing hooks, the Python package, the reflexio patch, or the install CLIs — install from a clone and point Claude Code at your working copy. This is the setup end users *don't* need; the `npx`/`uvx` install flow in the README covers them.
+
+### Step 1 — Clone with the reflexio submodule
 
 ```bash
-# From another project where you want to test
+git clone --recurse-submodules https://github.com/ReflexioAI/claude-smart.git
+cd claude-smart
+
+# If you forgot --recurse-submodules
+git submodule update --init --recursive
+```
+
+### Step 2 — Install Python dependencies
+
+```bash
+uv sync
+```
+
+Creates `.venv/`, pulls `reflexio-ai` as a path dep from `reflexio/`, and registers the `claude-smart` and `claude-smart-hook` console scripts.
+
+### Step 3 — Enable the local providers in reflexio
+
+```bash
+mkdir -p ~/.reflexio
+grep -q '^CLAUDE_SMART_USE_LOCAL_CLI=' ~/.reflexio/.env 2>/dev/null \
+  || echo 'CLAUDE_SMART_USE_LOCAL_CLI=1' >> ~/.reflexio/.env
+grep -q '^CLAUDE_SMART_USE_LOCAL_EMBEDDING=' ~/.reflexio/.env 2>/dev/null \
+  || echo 'CLAUDE_SMART_USE_LOCAL_EMBEDDING=1' >> ~/.reflexio/.env
+```
+
+(Equivalent to what the published install wrapper does for end users.) On first use the embedder downloads the ~80 MB ONNX model once to `~/.cache/chroma/onnx_models/`.
+
+### Step 4 — Start the reflexio backend
+
+Run from the **claude-smart repo root** (not the `reflexio/` subdir) so that `uv run` uses the claude-smart venv — which already has `chromadb` installed for the local embedder and `reflexio-ai` available as a path dep with the `reflexio` CLI script registered:
+
+```bash
+uv run reflexio services start --only backend --no-reload
+```
+
+Expected log lines:
+
+```
+Registered claude-code LiteLLM provider (cli=/path/to/claude)
+Local embedding provider enabled (model=local/minilm-l6-v2)
+Auto-detected LLM providers (priority order): ['claude-code', 'local']
+Primary provider for generation: claude-code
+Embedding provider: local
+Application startup complete.
+```
+
+Health check: `curl http://localhost:8081/health` → `{"status":"healthy"}`. Stop with `uv run reflexio services stop`.
+
+### Step 5 — Point Claude Code at your working copy
+
+**Project-level** (scoped to one project — recommended for most dev work):
+
+```bash
 mkdir -p .claude
 cat > .claude/settings.local.json <<JSON
 {
   "extraKnownMarketplaces": {
-    "claude-smart-dev": {
-      "source": { "source": "directory", "path": "/Users/yilu/repos/claude-smart" }
+    "claude-smart-local": {
+      "source": { "source": "directory", "path": "$PWD" }
     }
   },
-  "enabledPlugins": { "claude-smart@claude-smart-dev": true }
+  "enabledPlugins": { "claude-smart@claude-smart-local": true }
 }
 JSON
 ```
 
-Restart Claude Code in that directory. Changes to `plugin/` are picked up on the next session; changes to `src/claude_smart/` are picked up on the next hook invocation (since hooks shell out via `uv run`).
+**User-level** (all projects):
 
-You can also exercise the install CLIs against a local marketplace:
+Put the same JSON into `~/.claude/settings.json`, using an absolute path for `path`.
+
+Restart Claude Code. Changes to `plugin/` are picked up on the next session; changes to `src/claude_smart/` are picked up on the next hook invocation (hooks shell out via `uv run`, so editing the Python package takes effect immediately without a restart).
+
+### Step 6 — Sanity check
+
+Inside Claude Code:
+
+```
+/show
+```
+
+On a fresh project: `_No playbook or profiles yet for project `<name>`._`. Have a conversation, correct Claude on something (e.g. `"no, don't use X — use Y"`), then run `/learn`. After ~20–30 seconds, `/show` will surface the new rule.
+
+### Exercising the install CLIs against a local marketplace
+
+Useful when you're modifying the `install` subcommand itself and want to test without re-publishing:
 
 ```bash
 # Python path
-uv run claude-smart install --source /Users/yilu/repos/claude-smart
+uv run claude-smart install --source $PWD
 
 # Node path
-node bin/claude-smart.js install --source /Users/yilu/repos/claude-smart
+node bin/claude-smart.js install --source $PWD
 ```
+
+Both accept either a GitHub `owner/repo` ref or an absolute path to a local directory containing `.claude-plugin/marketplace.json`.
 
 ## Tests
 

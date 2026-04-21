@@ -11,7 +11,7 @@
     <img src="https://img.shields.io/badge/License-Apache%202.0-blue.svg" alt="License">
   </a>
   <a href="pyproject.toml">
-    <img src="https://img.shields.io/badge/version-0.1.0-green.svg" alt="Version">
+    <img src="https://img.shields.io/badge/version-0.1.2-green.svg" alt="Version">
   </a>
   <a href="pyproject.toml">
     <img src="https://img.shields.io/badge/python-%3E%3D3.12-brightgreen.svg" alt="Python">
@@ -56,37 +56,15 @@ The result is a compact, always-up-to-date set of instructions Claude reads at t
 ## Quick Start
 
 ```bash
-# 1. Clone with the reflexio backend submodule
-git clone --recurse-submodules https://github.com/ReflexioAI/claude-smart.git
-cd claude-smart
+# 1. Install the plugin into Claude Code (pick whichever is handier)
+npx claude-smart install                  # or: uvx claude-smart install
 
-# 2. Install dependencies (creates a uv-managed venv, pulls reflexio as a path dep)
-uv sync
-
-# 3. Turn on the local providers inside reflexio — no API key required at all
-mkdir -p ~/.reflexio
-grep -q '^CLAUDE_SMART_USE_LOCAL_CLI=' ~/.reflexio/.env 2>/dev/null \
-  || echo 'CLAUDE_SMART_USE_LOCAL_CLI=1' >> ~/.reflexio/.env
-grep -q '^CLAUDE_SMART_USE_LOCAL_EMBEDDING=' ~/.reflexio/.env 2>/dev/null \
-  || echo 'CLAUDE_SMART_USE_LOCAL_EMBEDDING=1' >> ~/.reflexio/.env
-
-# 4. Start the local reflexio backend (storage + search + extraction orchestrator)
+# 2. Start the reflexio backend (leave running in a separate terminal)
+cd ~/.claude/plugins/marketplaces/reflexioai
 uv run reflexio services start --only backend --no-reload
-
-# 5. Install the plugin into Claude Code (project-level)
-mkdir -p .claude && cat > .claude/settings.local.json <<'JSON'
-{
-  "extraKnownMarketplaces": {
-    "claude-smart-local": {
-      "source": { "source": "directory", "path": "." }
-    }
-  },
-  "enabledPlugins": { "claude-smart@claude-smart-local": true }
-}
-JSON
 ```
 
-Restart Claude Code in this workspace. The first time you correct Claude on something project-specific (*"no, don't use pytest-asyncio — use anyio with trio"*), a playbook rule will be extracted. Every subsequent session in the project starts with that rule injected — automatically, without you asking.
+Restart Claude Code. The first time you correct it on something project-specific (*"no, don't use pytest-asyncio — use anyio with trio"*), a playbook rule is extracted. Every subsequent session in the project starts with that rule injected — automatically, without you asking.
 
 ---
 
@@ -151,79 +129,43 @@ Cross-session playbook retrieval uses `search_user_playbooks(agent_version=proje
 
 ## Installation
 
-### One-command install
-
-If you just want the plugin wired into Claude Code (marketplace added, plugin installed, `~/.reflexio/.env` seeded with the local-provider flags), run **one** of:
-
-```bash
-# uvx — pulls the Python package straight from git, no clone required
-uvx --from git+https://github.com/ReflexioAI/claude-smart claude-smart install
-
-# npx — same thing via the published npm wrapper
-npx claude-smart install
-```
-
-Both do the same three things:
-
-1. `claude plugin marketplace add ReflexioAI/claude-smart`
-2. `claude plugin install claude-smart@yilu`
-3. Append `CLAUDE_SMART_USE_LOCAL_CLI=1` and `CLAUDE_SMART_USE_LOCAL_EMBEDDING=1` to `~/.reflexio/.env` (idempotent).
-
-You still need to start the reflexio backend yourself the first time (`uv run reflexio services start --only backend --no-reload` from a clone of this repo). Everything else — submodule init, `uv sync` — runs inside Claude Code's `Setup` hook on first session.
-
-For a manual, step-by-step walkthrough, see below.
-
 ### Prerequisites
 
 | Tool | Purpose |
 | --- | --- |
-| [Claude Code](https://claude.com/claude-code) | The host CLI — also used as the LLM backend for extraction |
-| [uv](https://docs.astral.sh/uv/) | Python package manager (Python 3.12+) |
-| `git` | Needed to clone with submodules and to derive the project id |
+| [Claude Code](https://claude.com/claude-code) | Host CLI — also the LLM backend for extraction |
+| [uv](https://docs.astral.sh/uv/) | Python 3.12+ package manager — runs the reflexio backend |
+| `git` | The install flow clones the plugin into Claude Code's plugin cache |
 
-> **No external API keys needed.** Generation runs through your local `claude` CLI (via a LiteLLM custom provider). Embeddings run through an in-process ONNX model (`all-MiniLM-L6-v2`, bundled by `chromadb`). Both are opt-in; when enabled, reflexio refuses to fall back to paid APIs.
+> **No external API keys needed.** Generation runs through your local `claude` CLI (via a LiteLLM custom provider). Embeddings run through an in-process ONNX model (`all-MiniLM-L6-v2`, bundled by `chromadb`). Both are turned on by default after install; reflexio refuses to fall back to paid APIs.
 
-### Step 1 — Clone the repository (with the reflexio submodule)
+### Step 1 — Install the plugin
+
+Pick whichever is handier — both published packages do the exact same thing:
 
 ```bash
-git clone --recurse-submodules https://github.com/ReflexioAI/claude-smart.git
-cd claude-smart
+# npm wrapper
+npx claude-smart install
 
-# If you forgot --recurse-submodules
-git submodule update --init --recursive
+# Python wrapper
+uvx claude-smart install
 ```
 
-### Step 2 — Install Python dependencies
+Either command:
+
+1. Registers `ReflexioAI/claude-smart` as a Claude Code marketplace, clones it to `~/.claude/plugins/marketplaces/reflexioai/`, and enables the plugin.
+2. Appends `CLAUDE_SMART_USE_LOCAL_CLI=1` and `CLAUDE_SMART_USE_LOCAL_EMBEDDING=1` to `~/.reflexio/.env` (idempotent — safe to re-run).
+
+On the first Claude Code session, the plugin's `Setup` hook runs `plugin/scripts/smart-install.sh` once — that initializes the reflexio submodule and runs `uv sync` inside the plugin directory. You don't have to do this manually.
+
+### Step 2 — Start the reflexio backend
 
 ```bash
-uv sync
-```
-
-This creates `.venv/`, pulls `reflexio-ai` as a path dependency from the `reflexio/` submodule, and registers the `claude-smart` and `claude-smart-hook` console scripts.
-
-### Step 3 — Enable the local providers in reflexio
-
-Two env flags turn on the local generation backend (Claude Code CLI) and the local embedder (in-process ONNX). Both live in `~/.reflexio/.env`:
-
-```bash
-mkdir -p ~/.reflexio
-grep -q '^CLAUDE_SMART_USE_LOCAL_CLI=' ~/.reflexio/.env 2>/dev/null \
-  || echo 'CLAUDE_SMART_USE_LOCAL_CLI=1' >> ~/.reflexio/.env
-grep -q '^CLAUDE_SMART_USE_LOCAL_EMBEDDING=' ~/.reflexio/.env 2>/dev/null \
-  || echo 'CLAUDE_SMART_USE_LOCAL_EMBEDDING=1' >> ~/.reflexio/.env
-```
-
-On first use, the embedder downloads the ~80 MB ONNX model once and caches it at `~/.cache/chroma/onnx_models/`. Subsequent starts reuse the cache and stay offline.
-
-### Step 4 — Start the reflexio backend
-
-Run this from the **claude-smart repo root** (not the `reflexio/` subdir) so that `uv run` uses the claude-smart venv — which already has `chromadb` installed for the local embedder and `reflexio-ai` available as a path dep with the `reflexio` CLI script registered:
-
-```bash
+cd ~/.claude/plugins/marketplaces/reflexioai
 uv run reflexio services start --only backend --no-reload
 ```
 
-You should see a log line like:
+Expected log lines:
 
 ```
 Registered claude-code LiteLLM provider (cli=/path/to/claude)
@@ -241,51 +183,36 @@ curl http://localhost:8081/health
 # {"status":"healthy"}
 ```
 
-Leave this running in a separate terminal. Stop it later with:
+Leave this running in a separate terminal. Stop it with:
 
 ```bash
 uv run reflexio services stop
 ```
 
-### Step 5 — Install the plugin into Claude Code
+On first use the embedder downloads the ~80 MB ONNX model once and caches it at `~/.cache/chroma/onnx_models/`. Subsequent starts reuse the cache and stay offline.
 
-**Project-level (recommended while you evaluate):**
+### Step 3 — Sanity check
 
-```bash
-mkdir -p .claude
-cat > .claude/settings.local.json <<JSON
-{
-  "extraKnownMarketplaces": {
-    "claude-smart-local": {
-      "source": { "source": "directory", "path": "$PWD" }
-    }
-  },
-  "enabledPlugins": { "claude-smart@claude-smart-local": true }
-}
-JSON
-```
-
-**User-level (all projects):**
-
-Put the same JSON into `~/.claude/settings.json`, using an absolute path for the marketplace `path`.
-
-Restart Claude Code. On the next session start you should see reflexio logs show a `search_user_playbooks` call — that's the SessionStart hook fetching the (currently empty) playbook.
-
-### Step 6 — Sanity check
-
-Inside Claude Code:
+Restart Claude Code. In any session:
 
 ```
 /show
 ```
 
-On a fresh project you'll see `_No playbook or profiles yet for project `<name>`._` — correct. Have a conversation, include at least one genuine correction (`"no, don't use X — use Y"`), then:
+On a fresh project: `_No playbook or profiles yet for project `<name>`._` — expected. Have a conversation, include at least one genuine correction (`"no, don't use X — use Y"`), then run `/learn` to force extraction. After ~20–30 seconds, `/show` will surface the new rule.
 
-```
-/learn
+### Uninstall
+
+```bash
+claude plugin uninstall claude-smart@reflexioai
+
+# Optional — wipe learned data and per-session buffers
+rm -rf ~/.reflexio/data/ ~/.claude-smart/sessions/
 ```
 
-That forces immediate extraction. Run `/show` again after ~20–30 seconds; the extracted rule should appear.
+### Developing claude-smart itself
+
+If you want to iterate on the plugin code (hooks, Python package, reflexio patch, install CLIs), don't install from npm/PyPI — clone the repo and point Claude Code at your working copy. See [DEVELOPER.md](./DEVELOPER.md#developing-locally) for the step-by-step.
 
 ---
 
@@ -379,7 +306,7 @@ project playbooks, and tweak the claude-smart environment. It connects to the
 same reflexio backend the plugin uses, so run that first.
 
 ```bash
-# 1. reflexio backend on :8081 (see Step 4 above)
+# 1. reflexio backend on :8081 (see Step 2 above)
 uv run reflexio services start --only backend --no-reload
 
 # 2. install and run the dashboard

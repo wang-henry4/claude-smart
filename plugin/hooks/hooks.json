@@ -7,7 +7,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "_R=\"${CLAUDE_PLUGIN_ROOT}\"; [ -z \"$_R\" ] && _R=\"$HOME/.claude/plugins/marketplaces/yilu/plugin\"; bash \"$_R/scripts/smart-install.sh\"",
+            "command": "_R=\"${CLAUDE_PLUGIN_ROOT}\"; [ -z \"$_R\" ] && _R=\"$HOME/.claude/plugins/marketplaces/reflexioai/plugin\"; bash \"$_R/scripts/smart-install.sh\"",
             "timeout": 300
           }
         ]
@@ -19,12 +19,12 @@
         "hooks": [
           {
             "type": "command",
-            "command": "_R=\"${CLAUDE_PLUGIN_ROOT}\"; [ -z \"$_R\" ] && _R=\"$HOME/.claude/plugins/marketplaces/yilu/plugin\"; bash \"$_R/scripts/hook_entry.sh\" session-start",
+            "command": "_R=\"${CLAUDE_PLUGIN_ROOT}\"; [ -z \"$_R\" ] && _R=\"$HOME/.claude/plugins/marketplaces/reflexioai/plugin\"; bash \"$_R/scripts/hook_entry.sh\" session-start",
             "timeout": 30
           },
           {
             "type": "command",
-            "command": "_R=\"${CLAUDE_PLUGIN_ROOT}\"; [ -z \"$_R\" ] && _R=\"$HOME/.claude/plugins/marketplaces/yilu/plugin\"; bash \"$_R/scripts/dashboard-service.sh\" start",
+            "command": "_R=\"${CLAUDE_PLUGIN_ROOT}\"; [ -z \"$_R\" ] && _R=\"$HOME/.claude/plugins/marketplaces/reflexioai/plugin\"; bash \"$_R/scripts/dashboard-service.sh\" start",
             "timeout": 10
           }
         ]
@@ -35,7 +35,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "_R=\"${CLAUDE_PLUGIN_ROOT}\"; [ -z \"$_R\" ] && _R=\"$HOME/.claude/plugins/marketplaces/yilu/plugin\"; bash \"$_R/scripts/hook_entry.sh\" user-prompt",
+            "command": "_R=\"${CLAUDE_PLUGIN_ROOT}\"; [ -z \"$_R\" ] && _R=\"$HOME/.claude/plugins/marketplaces/reflexioai/plugin\"; bash \"$_R/scripts/hook_entry.sh\" user-prompt",
             "timeout": 15
           }
         ]
@@ -47,7 +47,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "_R=\"${CLAUDE_PLUGIN_ROOT}\"; [ -z \"$_R\" ] && _R=\"$HOME/.claude/plugins/marketplaces/yilu/plugin\"; bash \"$_R/scripts/hook_entry.sh\" pre-tool",
+            "command": "_R=\"${CLAUDE_PLUGIN_ROOT}\"; [ -z \"$_R\" ] && _R=\"$HOME/.claude/plugins/marketplaces/reflexioai/plugin\"; bash \"$_R/scripts/hook_entry.sh\" pre-tool",
             "timeout": 10
           }
         ]
@@ -59,7 +59,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "_R=\"${CLAUDE_PLUGIN_ROOT}\"; [ -z \"$_R\" ] && _R=\"$HOME/.claude/plugins/marketplaces/yilu/plugin\"; bash \"$_R/scripts/hook_entry.sh\" post-tool",
+            "command": "_R=\"${CLAUDE_PLUGIN_ROOT}\"; [ -z \"$_R\" ] && _R=\"$HOME/.claude/plugins/marketplaces/reflexioai/plugin\"; bash \"$_R/scripts/hook_entry.sh\" post-tool",
             "timeout": 15
           }
         ]
@@ -70,7 +70,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "_R=\"${CLAUDE_PLUGIN_ROOT}\"; [ -z \"$_R\" ] && _R=\"$HOME/.claude/plugins/marketplaces/yilu/plugin\"; bash \"$_R/scripts/hook_entry.sh\" stop",
+            "command": "_R=\"${CLAUDE_PLUGIN_ROOT}\"; [ -z \"$_R\" ] && _R=\"$HOME/.claude/plugins/marketplaces/reflexioai/plugin\"; bash \"$_R/scripts/hook_entry.sh\" stop",
             "timeout": 30
           }
         ]
@@ -81,12 +81,12 @@
         "hooks": [
           {
             "type": "command",
-            "command": "_R=\"${CLAUDE_PLUGIN_ROOT}\"; [ -z \"$_R\" ] && _R=\"$HOME/.claude/plugins/marketplaces/yilu/plugin\"; bash \"$_R/scripts/hook_entry.sh\" session-end",
+            "command": "_R=\"${CLAUDE_PLUGIN_ROOT}\"; [ -z \"$_R\" ] && _R=\"$HOME/.claude/plugins/marketplaces/reflexioai/plugin\"; bash \"$_R/scripts/hook_entry.sh\" session-end",
             "timeout": 60
           },
           {
             "type": "command",
-            "command": "_R=\"${CLAUDE_PLUGIN_ROOT}\"; [ -z \"$_R\" ] && _R=\"$HOME/.claude/plugins/marketplaces/yilu/plugin\"; bash \"$_R/scripts/dashboard-service.sh\" session-end",
+            "command": "_R=\"${CLAUDE_PLUGIN_ROOT}\"; [ -z \"$_R\" ] && _R=\"$HOME/.claude/plugins/marketplaces/reflexioai/plugin\"; bash \"$_R/scripts/dashboard-service.sh\" session-end",
             "timeout": 10
           }
         ]

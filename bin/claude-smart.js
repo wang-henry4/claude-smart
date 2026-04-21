@@ -15,7 +15,7 @@ const { homedir } = require("os");
 const { dirname, join } = require("path");
 
 const DEFAULT_MARKETPLACE_SOURCE = "ReflexioAI/claude-smart";
-const PLUGIN_SPEC = "claude-smart@yilu";
+const PLUGIN_SPEC = "claude-smart@reflexioai";
 const REFLEXIO_ENV_PATH = join(homedir(), ".reflexio", ".env");
 
 function hasClaudeCli() {

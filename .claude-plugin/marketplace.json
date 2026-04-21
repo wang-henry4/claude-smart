@@ -1,5 +1,5 @@
 {
-  "name": "yilu",
+  "name": "reflexioai",
   "owner": {
     "name": "Yi Lu"
   },
@@ -9,7 +9,7 @@
   "plugins": [
     {
       "name": "claude-smart",
-      "version": "0.1.1",
+      "version": "0.1.2",
       "source": "./plugin",
       "description": "Learns user corrections and project playbooks via reflexio — uses Claude Code itself as the LLM backend (no external API key required)"
     }
