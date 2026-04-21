@@ -65,6 +65,7 @@ class Adapter:
         project_id: str,
         interactions: Sequence[dict[str, Any]],
         force_extraction: bool = False,
+        skip_aggregation: bool = False,
     ) -> bool:
         """Publish buffered interactions to reflexio. Returns True on success."""
         if not interactions:
@@ -80,11 +81,45 @@ class Adapter:
                 session_id=session_id,
                 wait_for_response=False,
                 force_extraction=force_extraction,
+                skip_aggregation=skip_aggregation,
             )
             return True
         except Exception as exc:  # noqa: BLE001
             _LOGGER.warning("publish_interaction failed: %s", exc)
             return False
+
+    def delete_all(self) -> tuple[dict[str, int], list[tuple[str, str]]] | None:
+        """Delete all interactions, profiles, and user playbooks from reflexio.
+
+        Returns:
+            tuple[dict[str, int], list[tuple[str, str]]] | None: A
+                ``(counts, errors)`` pair on reachable reflexio, or ``None``
+                if the client could not be constructed at all. ``counts``
+                maps entity name → deleted row count (``0`` for entities
+                whose delete raised). ``errors`` is a list of
+                ``(entity_name, exception_message)`` tuples for every
+                individual failure, so the caller can distinguish "deleted
+                nothing" from "delete raised" and surface it to the user.
+        """
+        client = self._get_client()
+        if client is None:
+            return None
+        counts: dict[str, int] = {}
+        errors: list[tuple[str, str]] = []
+        for name, method in (
+            ("interactions", "delete_all_interactions"),
+            ("profiles", "delete_all_profiles"),
+            ("user_playbooks", "delete_all_user_playbooks"),
+        ):
+            try:
+                response = getattr(client, method)()
+            except Exception as exc:  # noqa: BLE001 — adapter must never raise.
+                _LOGGER.warning("%s failed: %s", method, exc)
+                counts[name] = 0
+                errors.append((name, str(exc)))
+                continue
+            counts[name] = getattr(response, "deleted_count", 0) or 0
+        return counts, errors
 
     def apply_batch_defaults(self, *, batch_size: int, batch_interval: int) -> bool:
         """Push claude-smart's preferred batch defaults to the reflexio server.

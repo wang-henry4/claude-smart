@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Users, ChevronRight } from "lucide-react";
 import { PageHeader } from "@/components/common/page-header";
 import { EmptyState } from "@/components/common/empty-state";
+import { DeleteAllButton } from "@/components/common/delete-all-button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { reflexio } from "@/lib/reflexio-client";
@@ -48,12 +49,23 @@ export default function ProfilesPage() {
         title="Profiles"
         description="Session-scoped user preferences extracted from interactions."
         actions={
-          <Input
-            value={filter}
-            onChange={(e) => setFilter(e.target.value)}
-            placeholder="Filter"
-            className="h-8 w-56 text-xs"
-          />
+          <div className="flex items-center gap-2">
+            <Input
+              value={filter}
+              onChange={(e) => setFilter(e.target.value)}
+              placeholder="Filter"
+              className="h-8 w-56 text-xs"
+            />
+            <DeleteAllButton
+              label={`Delete all${profiles && profiles.length > 0 ? ` (${profiles.length})` : ""}`}
+              confirmMessage={`Delete ALL ${profiles?.length ?? 0} profiles? Profiles regenerate from fresh interactions, but this cannot be undone.`}
+              disabled={!profiles || profiles.length === 0}
+              onConfirm={async () => {
+                await reflexio.deleteAllProfiles(reflexioUrl);
+                setProfiles([]);
+              }}
+            />
+          </div>
         }
       />
 

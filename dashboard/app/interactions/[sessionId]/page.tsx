@@ -2,7 +2,14 @@
 
 import { use, useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Wrench, AlertTriangle, ChevronRight } from "lucide-react";
+import { useRouter } from "next/navigation";
+import {
+  ArrowLeft,
+  Wrench,
+  AlertTriangle,
+  ChevronRight,
+  Trash2,
+} from "lucide-react";
 import { PageHeader } from "@/components/common/page-header";
 import { EmptyState } from "@/components/common/empty-state";
 import { Badge } from "@/components/ui/badge";
@@ -17,8 +24,26 @@ export default function InteractionDetailPage({
   params: Promise<{ sessionId: string }>;
 }) {
   const { sessionId } = use(params);
+  const router = useRouter();
   const [detail, setDetail] = useState<SessionDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  const remove = async () => {
+    if (!confirm(`Delete session ${sessionId}? This cannot be undone.`)) return;
+    setDeleting(true);
+    try {
+      const res = await fetch(
+        `/api/sessions/${encodeURIComponent(sessionId)}`,
+        { method: "DELETE" },
+      );
+      if (!res.ok) throw new Error(`delete failed: ${res.status}`);
+      router.push("/interactions");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+      setDeleting(false);
+    }
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -44,12 +69,23 @@ export default function InteractionDetailPage({
         title="Session transcript"
         description={sessionId}
         actions={
-          <Link href="/interactions">
-            <Button variant="outline" size="sm">
-              <ArrowLeft className="h-3.5 w-3.5" />
-              Back
+          <div className="flex items-center gap-2">
+            <Link href="/interactions">
+              <Button variant="outline" size="sm">
+                <ArrowLeft className="h-3.5 w-3.5" />
+                Back
+              </Button>
+            </Link>
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={remove}
+              disabled={deleting}
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              {deleting ? "Deleting…" : "Delete"}
             </Button>
-          </Link>
+          </div>
         }
       />
 

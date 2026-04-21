@@ -70,7 +70,9 @@ export interface SessionSummary {
   turn_count: number;
   has_correction: boolean;
   last_activity: number | null;
+  first_activity: number | null;
   published_up_to: number;
+  preview: string | null;
   source: "local";
 }
 

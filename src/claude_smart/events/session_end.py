@@ -1,4 +1,4 @@
-"""SessionEnd hook — flush any remaining interactions with force_extraction=True."""
+"""SessionEnd hook — flush any remaining interactions; extraction runs async."""
 
 from __future__ import annotations
 
@@ -13,5 +13,8 @@ def handle(payload: dict[str, Any]) -> None:
         return
     project_id = ids.resolve_project_id(payload.get("cwd"))
     publish.publish_unpublished(
-        session_id=session_id, project_id=project_id, force_extraction=True
+        session_id=session_id,
+        project_id=project_id,
+        force_extraction=False,
+        skip_aggregation=True,
     )

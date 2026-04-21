@@ -21,6 +21,7 @@ def publish_unpublished(
     session_id: str,
     project_id: str,
     force_extraction: bool,
+    skip_aggregation: bool,
     adapter: Adapter | None = None,
 ) -> tuple[PublishStatus, int]:
     """Drain the session buffer to reflexio and stamp the high-water mark.
@@ -30,6 +31,10 @@ def publish_unpublished(
         project_id (str): Stable project name (reflexio agent_version).
         force_extraction (bool): Whether to ask reflexio to run extraction
             synchronously instead of queuing for the next sweep.
+        skip_aggregation (bool): When True, reflexio extracts profiles and
+            raw playbook entries but skips the rollup into agent-level
+            project playbooks. Every claude-smart publish path (Stop,
+            SessionEnd, /learn) passes True.
         adapter (Adapter | None): Injection point for tests; a fresh
             ``Adapter()`` is constructed when omitted.
 
@@ -50,6 +55,7 @@ def publish_unpublished(
         project_id=project_id,
         interactions=interactions,
         force_extraction=force_extraction,
+        skip_aggregation=skip_aggregation,
     )
     if ok:
         state.append(session_id, {"published_up_to": len(records)})

@@ -144,4 +144,27 @@ export const reflexio = {
       reflexioUrl,
     );
   },
+
+  /** DELETE /api/delete_all_interactions — org-wide purge. */
+  async deleteAllInteractions(reflexioUrl?: string): Promise<Json> {
+    return request(
+      "delete_all_interactions",
+      { method: "DELETE" },
+      reflexioUrl,
+    );
+  },
+
+  /** DELETE /api/delete_all_profiles — org-wide purge. */
+  async deleteAllProfiles(reflexioUrl?: string): Promise<Json> {
+    return request("delete_all_profiles", { method: "DELETE" }, reflexioUrl);
+  },
+
+  /** DELETE /api/delete_all_user_playbooks — org-wide purge. */
+  async deleteAllUserPlaybooks(reflexioUrl?: string): Promise<Json> {
+    return request(
+      "delete_all_user_playbooks",
+      { method: "DELETE" },
+      reflexioUrl,
+    );
+  },
 };

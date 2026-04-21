@@ -24,6 +24,11 @@
           },
           {
             "type": "command",
+            "command": "_R=\"${CLAUDE_PLUGIN_ROOT}\"; [ -z \"$_R\" ] && _R=\"$HOME/.claude/plugins/marketplaces/reflexioai/plugin\"; bash \"$_R/scripts/backend-service.sh\" start",
+            "timeout": 30
+          },
+          {
+            "type": "command",
             "command": "_R=\"${CLAUDE_PLUGIN_ROOT}\"; [ -z \"$_R\" ] && _R=\"$HOME/.claude/plugins/marketplaces/reflexioai/plugin\"; bash \"$_R/scripts/dashboard-service.sh\" start",
             "timeout": 10
           }
@@ -87,6 +92,11 @@
           {
             "type": "command",
             "command": "_R=\"${CLAUDE_PLUGIN_ROOT}\"; [ -z \"$_R\" ] && _R=\"$HOME/.claude/plugins/marketplaces/reflexioai/plugin\"; bash \"$_R/scripts/dashboard-service.sh\" session-end",
+            "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "_R=\"${CLAUDE_PLUGIN_ROOT}\"; [ -z \"$_R\" ] && _R=\"$HOME/.claude/plugins/marketplaces/reflexioai/plugin\"; bash \"$_R/scripts/backend-service.sh\" session-end",
             "timeout": 10
           }
         ]

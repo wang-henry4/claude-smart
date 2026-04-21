@@ -1,7 +1,8 @@
 "use client";
 
 import { useTheme } from "next-themes";
-import { Moon, Sun, Menu, Sparkles } from "lucide-react";
+import Image from "next/image";
+import { Moon, Sun, Menu } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useSettings } from "@/hooks/use-settings";
@@ -26,7 +27,14 @@ export function TopBar() {
       </Sheet>
 
       <div className="flex items-center gap-2 flex-1 min-w-0">
-        <Sparkles className="h-5 w-5 shrink-0 text-foreground" />
+        <Image
+          src="/claude-smart-icon.png"
+          alt="claude-smart"
+          width={24}
+          height={24}
+          className="h-6 w-6 shrink-0"
+          priority
+        />
         <span className="text-sm font-semibold whitespace-nowrap hidden sm:block">
           Claude-Smart
         </span>

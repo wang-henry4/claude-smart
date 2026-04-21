@@ -1,0 +1,340 @@
+[
+  {
+    "scenario_id": "pref-testfmk",
+    "category": "personalization",
+    "ground_truth": "User prefers pytest over unittest as a project-wide rule.",
+    "probe_query": "What Python test framework does the user prefer?",
+    "project_dir": "/tmp/membench/pref-testfmk",
+    "session_id": "",
+    "replay_ok": true,
+    "replay_error": null,
+    "systems": [
+      {
+        "system": "claude-smart",
+        "retrieved": [
+          "[playbook] Use pytest for all Python test code and framework recommendations in this project \u2014 never unittest. Apply to: sample tests, new test files, test framework suggestions, and scaffolding. Write pytest-style tests (plain functions with assert statements), not unittest.TestCase subclasses. | Writing, suggesting, or scaffolding Python tests in this project | The user explicitly declared this as a project-wide rule: 'I always use pytest, never unittest \u2014 make that a project-wide rule for me going forward'."
+        ],
+        "score": {
+          "recall": 3,
+          "specificity": 3,
+          "rationale": "Memory directly states pytest preference and explicitly forbids unittest, with implementation details and scope guidance.",
+          "error": null
+        },
+        "notes": []
+      },
+      {
+        "system": "claude-mem",
+        "retrieved": [
+          "[obs] User prefers pytest for Python testing | User always uses pytest as the Python testing framework. | The user has indicated a consistent preference for pytest as their Python testing framework. Any Python project work should default to pytest for writing and running tests, rather than unittest or other alternatives. | [\"User explicitly stated \\\"I always use pytest\\\" as a testing preference.\",\"pytest should be used as the default test runner for any Python project.\"]",
+          "[obs] Project-wide pytest preference established | User mandated pytest as the sole test framework, explicitly excluding unittest, for all Python projects. | During a new Python project setup session, the user declared a firm standing rule: always use pytest, never unittest. This is a durable project-wide preference that should be applied automatically in any future Python testing context without prompting. The sample test requested was `def test_add(): assert add(1, 2) == 3` style (pytest idiomatic, no TestCase subclassing). | [\"pytest is the required test framework for this user's Python projects.\",\"unittest is explicitly prohibited \u2014 never to be used.\",\"Rule was set as a project-wide standing preference, not a one-off request.\",\"Working directory for this preference capture: /tmp/membench/pref-testfmk\",\"A one-line sample test for add(a, b) was requested as a follow-up, confirming active pytest usage.\"]",
+          "[obs] Project-wide pytest preference established | User mandated pytest as the exclusive test framework, explicitly excluding unittest for all Python projects. | While starting a new Python project, the user explicitly declared that pytest is the required test framework and unittest must never be used. This applies as a standing project-wide rule going forward. The user also requested a minimal one-line pytest-style test for an add(a, b) function, confirming the pytest assertion style (plain assert statements, no unittest.TestCase subclassing). | [\"User preference: always use pytest, never unittest \u2014 stated as a project-wide rule.\",\"Working directory for this preference context: /tmp/membench/pref-testfmk\",\"Sample pytest test for add(a, b): `def test_add(): assert add(1, 2) == 3`\"]",
+          "[obs] pytest adopted as exclusive test framework for Python projects | User explicitly banned unittest in favor of pytest as a project-wide rule. | At the start of a new Python project, the user stated a firm, ongoing preference: always use pytest, never unittest. This is a standing rule to apply in all future test-writing for this user. The canonical one-line pytest test pattern for a simple function like add(a, b) follows the `assert` style rather than unittest's class-based approach. | [\"User prefers pytest exclusively; unittest is explicitly prohibited.\",\"Rule applies project-wide, intended to persist across future sessions.\",\"Sample pytest test for add(a, b): `def test_add(): assert add(2, 3) == 5`\",\"Working directory for this project is /tmp/membench/pref-testfmk\"]"
+        ],
+        "score": {
+          "recall": 3,
+          "specificity": 3,
+          "rationale": "Ground truth fully present in all memories; specific enough to act on with project-wide scope and test patterns.",
+          "error": null
+        },
+        "notes": []
+      }
+    ]
+  },
+  {
+    "scenario_id": "pref-formatting",
+    "category": "personalization",
+    "ground_truth": "User requires 4-space indents and double quotes in Python code; no tabs, no single quotes.",
+    "probe_query": "What formatting style does the user require for Python code?",
+    "project_dir": "/tmp/membench/pref-formatting",
+    "session_id": "",
+    "replay_ok": true,
+    "replay_error": null,
+    "systems": [
+      {
+        "system": "claude-smart",
+        "retrieved": [],
+        "score": {
+          "recall": 0,
+          "specificity": 0,
+          "rationale": "Memory retrieval returned empty; ground truth formatting requirements (4-space indents, double quotes, no tabs/single quotes) completely absent from system.",
+          "error": null
+        },
+        "notes": []
+      },
+      {
+        "system": "claude-mem",
+        "retrieved": [
+          "[obs] Python Formatting Preferences Established | User prefers 4-space indentation and double quotes for all Python code. | The user established their Python code style preferences in this session. They use 4-space indentation (consistent with PEP 8) and double quotes for string literals. These preferences should be applied consistently in all future Python code suggestions, completions, and examples \u2014 tabs and single quotes should never be proposed. | [\"User prefers 4-space indents over tabs in Python code.\",\"User prefers double quotes over single quotes for Python strings.\",\"User explicitly stated: never suggest tabs or single quotes.\",\"4-space indentation aligns with PEP 8, the official Python style guide.\"]"
+        ],
+        "score": {
+          "recall": 3,
+          "specificity": 3,
+          "rationale": "Retrieved memory contains all ground truth elements: 4-space indentation, double quotes, and explicit prohibitions on tabs/single quotes. Fully actionable.",
+          "error": null
+        },
+        "notes": []
+      }
+    ]
+  },
+  {
+    "scenario_id": "pref-stack",
+    "category": "personalization",
+    "ground_truth": "User deploys on Railway and prefers Postgres over MySQL across all projects.",
+    "probe_query": "Where does the user deploy and what database do they prefer?",
+    "project_dir": "/tmp/membench/pref-stack",
+    "session_id": "",
+    "replay_ok": true,
+    "replay_error": null,
+    "systems": [
+      {
+        "system": "claude-smart",
+        "retrieved": [],
+        "score": {
+          "recall": 0,
+          "specificity": 0,
+          "rationale": "Ground truth completely absent from empty retrieval result",
+          "error": null
+        },
+        "notes": []
+      },
+      {
+        "system": "claude-mem",
+        "retrieved": [
+          "[obs] Deployment and Database Preferences: Railway + Postgres | User standardized on Railway for all deployments and Postgres over MySQL for all projects. | During a session about picking a deployment target for a small API, the user stated standing preferences that apply across all projects: Railway is the deployment platform of choice, and Postgres is always preferred over MySQL. A one-line DATABASE_URL env var was then requested based on these constraints, implying the standard PostgreSQL connection string format should be used in future project scaffolding and configuration. | [\"All projects deploy to Railway as the chosen deployment platform.\",\"Postgres is the preferred database engine; MySQL is explicitly avoided.\",\"Recommended DATABASE_URL format for Railway + Postgres: postgresql://USER:PASSWORD@HOST:PORT/DBNAME\"]"
+        ],
+        "score": {
+          "recall": 3,
+          "specificity": 3,
+          "rationale": "Memory accurately captures both Railway deployment and Postgres preference with specific DATABASE_URL format for implementation.",
+          "error": null
+        },
+        "notes": []
+      }
+    ]
+  },
+  {
+    "scenario_id": "corr-async",
+    "category": "correction",
+    "ground_truth": "User corrected: this codebase is synchronous; do not write async code in this project.",
+    "probe_query": "Should async code be used in this project?",
+    "project_dir": "/tmp/membench/corr-async",
+    "session_id": "",
+    "replay_ok": true,
+    "replay_error": null,
+    "systems": [
+      {
+        "system": "claude-smart",
+        "retrieved": [
+          "[playbook] Default to synchronous code in this codebase \u2014 it is fully synchronous and async must never be introduced. For httpx specifically, use `httpx.get(...)` / `httpx.Client` rather than `httpx.AsyncClient` or `async def`. The user explicitly said 'Stop using async \u2014 this codebase is fully synchronous. Never write async code in this project' after the agent produced an async implementation. | Writing Python HTTP client code (e.g., with httpx) in this codebase. | The user explicitly corrected the agent after it produced async code, establishing a durable project-wide constraint that should shape all future code generation in this codebase."
+        ],
+        "score": {
+          "recall": 3,
+          "specificity": 3,
+          "rationale": "Memory directly states the ground truth (synchronous only, never async) with concrete httpx examples and clear scope.",
+          "error": null
+        },
+        "notes": []
+      },
+      {
+        "system": "claude-mem",
+        "retrieved": [
+          "[obs] Async Prohibited in corr-async Project \u2014 Sync-Only Constraint | Explicit project rule established: the codebase is fully synchronous and async code must never be written. | During iterative development of fetch_user(id) in the corr-async project, an async implementation was first produced. A project-wide constraint was then declared: the codebase is fully synchronous and async code must never be written. The function was subsequently rewritten as a one-line synchronous httpx.get() call. This constraint should be remembered for all future work in this project to avoid producing async code. | [\"Project at /tmp/membench/corr-async is fully synchronous \u2014 async/await patterns are explicitly banned.\",\"Initial fetch_user(id) implementation was written with async, then corrected to synchronous after rule was stated.\",\"fetch_user(id) was rewritten as a one-line synchronous httpx call after the async prohibition was enforced.\"]",
+          "[obs] Python fetch_user(id) One-Liner Using httpx | Implemented a single-line Python function to fetch a user by ID from an HTTP API using httpx. | The user requested a minimal one-line Python function named fetch_user(id) that performs an HTTP API call using the httpx library. The implementation leverages httpx.get() to make a synchronous GET request to a user endpoint, returning the JSON-parsed response. httpx was explicitly specified as the HTTP client, likely preferred for its modern API, async compatibility, and type annotations over the older requests library. | [\"Function signature: fetch_user(id) returns the parsed JSON response from an HTTP GET request.\",\"Uses httpx.get() for synchronous HTTP calls in a one-line lambda or def expression.\",\"httpx is the chosen HTTP client library over alternatives like requests or urllib.\"]"
+        ],
+        "score": {
+          "recall": 3,
+          "specificity": 3,
+          "rationale": "Ground truth clearly present. Memory explicitly bans async code and provides sync examples\u2014actionable.",
+          "error": null
+        },
+        "notes": []
+      }
+    ]
+  },
+  {
+    "scenario_id": "corr-verbose",
+    "category": "correction",
+    "ground_truth": "User corrected: no docstrings or comments; keep code terse and minimal.",
+    "probe_query": "Does the user want docstrings and comments in their code?",
+    "project_dir": "/tmp/membench/corr-verbose",
+    "session_id": "",
+    "replay_ok": true,
+    "replay_error": null,
+    "systems": [
+      {
+        "system": "claude-smart",
+        "retrieved": [
+          "[playbook] When generating code for this user, default to terse minimal code: no docstrings, no explanatory comments, one-line implementations when possible. The user pushed back on the agent's default of adding a full docstring to a one-line function, stating 'stop writing docstrings and comments \u2014 I want terse code only. Keep it minimal from now on.' Apply this style to all subsequent code output in the session unless the user explicitly asks for documentation. | User asks for small code snippets or functions and the agent's default is to include docstrings, explanatory comments, or verbose formatting. | The user explicitly corrected the agent's default of adding docstrings/comments, asking for terse minimal code going forward. This captures a durable style preference the agent should respect in future code generation."
+        ],
+        "score": {
+          "recall": 3,
+          "specificity": 3,
+          "rationale": "Memory explicitly states 'no docstrings, no explanatory comments' and includes user's exact directive. Directly answers probe query.",
+          "error": null
+        },
+        "notes": []
+      },
+      {
+        "system": "claude-mem",
+        "retrieved": [
+          "[obs] Coding Style Preference: Terse, No Docstrings or Comments | User corrected initial verbose request and established a preference for minimal, comment-free code going forward. | In this session the user first requested a one-line `square(x)` function with a full docstring, then immediately overrode that with a standing instruction to produce only terse, minimal code \u2014 no docstrings, no comments. The follow-up task was to rewrite `square(x)` under the new style. The project path (`corr-verbose`) implies this may be a correction benchmark testing how well an agent updates its style after explicit user feedback. | [\"Initial request asked for `square(x)` with a full docstring; user immediately reversed this preference.\",\"User explicitly stated: \\\"No, stop writing docstrings and comments \u2014 I want terse code only. Keep it minimal from now on.\\\"\",\"`square(x)` was to be rewritten as a single line with no docstring or comments under the new style.\",\"Working directory is `/tmp/membench/corr-verbose`, suggesting a benchmark scenario testing style-correction behavior.\"]"
+        ],
+        "score": {
+          "recall": 3,
+          "specificity": 3,
+          "rationale": "Ground truth (no docstrings/comments, terse code) clearly stated in retrieval with specific examples and user quotes.",
+          "error": null
+        },
+        "notes": []
+      }
+    ]
+  },
+  {
+    "scenario_id": "corr-lib",
+    "category": "correction",
+    "ground_truth": "User corrected: do not use PyYAML due to security; use ruamel.yaml in this project.",
+    "probe_query": "What YAML library should be used in this project, and what should be avoided?",
+    "project_dir": "/tmp/membench/corr-lib",
+    "session_id": "",
+    "replay_ok": true,
+    "replay_error": null,
+    "systems": [
+      {
+        "system": "claude-smart",
+        "retrieved": [
+          "[playbook] Use ruamel.yaml, not PyYAML, for all YAML parsing/serialization in this project. The user flagged PyYAML as insecure and standardized on ruamel.yaml. Default to `from ruamel.yaml import YAML; data = YAML(typ='safe').load(open('file.yaml'))` and do not suggest PyYAML or `yaml.safe_load`. Apply this without waiting for the user to re-specify the library. | When writing or suggesting YAML parsing/serialization code in Python for this project. | User explicitly flagged PyYAML as insecure and mandated ruamel.yaml as the project standard for YAML parsing/serialization.",
+          "[playbook] Do not respond by restating or acknowledging the user's request \u2014 produce the actual deliverable (e.g., the one-line code snippet). Why: the user asked for a one-line YAML parse snippet and received only an acknowledgement, forcing them to re-ask. How to apply: when the user requests code, output the code directly; skip 'Acknowledged' / 'I'll follow what you said' preambles. | User asks for a concrete code snippet or direct answer. | Across both turns the agent responded with a meta-acknowledgement ('Acknowledged. I'll follow what you said: ...') instead of delivering the requested code. The user's follow-up 'Redo it in one line with the right library' implicitly signals that the first reply was non-responsive."
+        ],
+        "score": {
+          "recall": 3,
+          "specificity": 3,
+          "rationale": "Ground truth fully present; memory states use ruamel.yaml, avoid PyYAML due to security, with code example and mandate.",
+          "error": null
+        },
+        "notes": []
+      },
+      {
+        "system": "claude-mem",
+        "retrieved": [
+          "[obs] Project mandates ruamel.yaml over PyYAML for security | PyYAML is explicitly banned in this project; ruamel.yaml is the required YAML library. | A developer asked for a one-line Python snippet to parse a YAML file. After an initial response (likely using PyYAML), the developer corrected the approach: PyYAML is explicitly prohibited in this project due to security concerns, and ruamel.yaml must be used instead. The correct one-liner with ruamel.yaml was then produced. This is a project-wide constraint that must be respected in all future YAML-related Python code in corr-lib. | [\"PyYAML is considered insecure and is not permitted in this project (corr-lib).\",\"ruamel.yaml is the mandated YAML parsing library for all Python code in this project.\",\"One-line YAML file parsing in Python using ruamel.yaml: `data = ruamel.yaml.YAML().load(open(\\\"file.yaml\\\"))`\",\"Project root is /tmp/membench/corr-lib.\"]"
+        ],
+        "score": {
+          "recall": 3,
+          "specificity": 3,
+          "rationale": "Ground truth fully present: PyYAML explicitly banned for security, ruamel.yaml mandated. Retrieved memory contains all core facts plus actionable code example.",
+          "error": null
+        },
+        "notes": []
+      }
+    ]
+  },
+  {
+    "scenario_id": "gen-role",
+    "category": "general",
+    "ground_truth": "User is a data scientist currently working on observability and logging for ETL pipelines.",
+    "probe_query": "What is the user's role and current focus?",
+    "project_dir": "/tmp/membench/gen-role",
+    "session_id": "",
+    "replay_ok": true,
+    "replay_error": null,
+    "systems": [
+      {
+        "system": "claude-smart",
+        "retrieved": [],
+        "score": {
+          "recall": 0,
+          "specificity": 0,
+          "rationale": "No memory retrieved; ground truth entirely absent.",
+          "error": null
+        },
+        "notes": []
+      },
+      {
+        "system": "claude-mem",
+        "retrieved": [],
+        "score": {
+          "recall": 0,
+          "specificity": 0,
+          "rationale": "No memory rows returned; ground truth absent entirely",
+          "error": null
+        },
+        "notes": []
+      }
+    ]
+  },
+  {
+    "scenario_id": "gen-team",
+    "category": "general",
+    "ground_truth": "User maintains the billing service on a 3-person team with weekly Friday releases.",
+    "probe_query": "What service does the user own and what is their release cadence?",
+    "project_dir": "/tmp/membench/gen-team",
+    "session_id": "",
+    "replay_ok": true,
+    "replay_error": null,
+    "systems": [
+      {
+        "system": "claude-smart",
+        "retrieved": [],
+        "score": {
+          "recall": 0,
+          "specificity": 0,
+          "rationale": "Ground truth completely absent; no memory rows returned for query.",
+          "error": null
+        },
+        "notes": []
+      },
+      {
+        "system": "claude-mem",
+        "retrieved": [
+          "[obs] Billing Service Team Release Cadence and Planning Context | Team of 3 maintains billing service with weekly Friday shipments; release branches for Wednesday merges should be cut Wednesday or Thursday. | The user shared team context: they own the billing service, have a 3-person team, and ship every Friday. They asked a planning question about when to cut a release branch for a change landing on Wednesday. Given a Friday ship date, Wednesday is the natural time to cut the release branch immediately after the change merges, with Thursday as the last reasonable option to allow QA/staging time before the Friday release. | [\"The billing service is maintained by a 3-person team.\",\"The team ships every Friday on a fixed weekly cadence.\",\"For a change merging on Wednesday, the release branch should be cut on Wednesday (same day) or Thursday at latest to allow time before Friday ship.\",\"Session workspace was /tmp/membench/gen-team.\"]"
+        ],
+        "score": {
+          "recall": 3,
+          "specificity": 3,
+          "rationale": "Ground truth fully present: billing service ownership, 3-person team, weekly Friday cadence all explicitly stated. Actionable detail on release branch timing included.",
+          "error": null
+        },
+        "notes": []
+      }
+    ]
+  },
+  {
+    "scenario_id": "gen-freeze",
+    "category": "general",
+    "ground_truth": "Merge freeze for non-critical PRs starts after Thursday due to the mobile release-branch cut.",
+    "probe_query": "Is there a merge freeze coming up, and why?",
+    "project_dir": "/tmp/membench/gen-freeze",
+    "session_id": "",
+    "replay_ok": true,
+    "replay_error": null,
+    "systems": [
+      {
+        "system": "claude-smart",
+        "retrieved": [
+          "[playbook] Recipe for merge-timing decisions under a freeze: (1) Convert the relative deadline to an absolute date \u2014 in this trajectory 'after Thursday' with today=2026-04-21 (Tuesday) resolves to freeze start 2026-04-24 (Friday), so Thu 2026-04-23 is the last shippable day. (2) Classify the PR: 'nice-to-have refactor' = non-critical, explicitly covered by the freeze. (3) One-line answer format: ship today (or before Thu 2026-04-23) to land before the freeze, otherwise wait until the mobile release branch is cut. Always convert relative dates to absolute dates when saving project memory about the freeze. | User asks whether a non-critical / nice-to-have PR should ship given a stated merge-freeze deadline tied to another team's release cut. | Captures the concrete date conversion and decision heuristic needed to answer merge-timing questions against a freeze window, so a future similar question can be answered directly.",
+          "[playbook] When the user shares background context (deadlines, team constraints, priorities, freezes), do not reply with verbatim 'Acknowledged, I'll follow what you said: <echo>' restatements. Give a brief confirmation that demonstrates understanding of the implication (e.g., note the concrete date derived from 'Thursday', or the class of work it affects), or simply acknowledge concisely and wait for the actual task. Echoing the user's own words back adds no value and signals the context was stored but not processed. | User shares project context, constraints, deadlines, or situational background without asking an immediate question. | The agent's response to the user's context-setting messages was a rote acknowledgment ('I'll follow what you said: ...') that merely echoed the user's text back. This wastes turns and fails to internalize the constraint for future reasoning \u2014 the user then had to ask a direct question to test whether the agent actually understood."
+        ],
+        "score": {
+          "recall": 3,
+          "specificity": 3,
+          "rationale": "Merge-freeze facts embedded in actionable decision playbook; dates and causation clear.",
+          "error": null
+        },
+        "notes": []
+      },
+      {
+        "system": "claude-mem",
+        "retrieved": [
+          "[obs] Merge Freeze Planned After Thursday for Mobile Release Branch | All non-critical merges are frozen after Thursday due to the mobile team cutting a release branch. | The team has a short merge window this week (2026-04-21 through Thursday 2026-04-24). After Thursday, all non-critical merges are frozen because the mobile team is cutting a release branch. The user is actively prioritizing merges to land work before the freeze. A nice-to-have refactor PR was explicitly flagged as something that should ship today (before the freeze) rather than wait \u2014 implying urgency for any non-critical but desirable work to land before Thursday's cutoff. | [\"User is prioritizing merges during the week of 2026-04-21.\",\"A merge freeze for non-critical PRs takes effect after Thursday 2026-04-24.\",\"Freeze is triggered by the mobile team cutting a release branch.\",\"Nice-to-have refactor PRs should ship before Thursday or wait until after the freeze lifts.\"]"
+        ],
+        "score": {
+          "recall": 3,
+          "specificity": 3,
+          "rationale": "Ground truth fully present with exact trigger and dates",
+          "error": null
+        },
+        "notes": []
+      }
+    ]
+  }
+]

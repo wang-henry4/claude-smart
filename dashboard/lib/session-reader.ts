@@ -54,12 +54,16 @@ function foldTurns(records: RawRecord[]): {
   publishedUpTo: number;
   hasCorrection: boolean;
   lastTs: number | null;
+  firstTs: number | null;
+  preview: string | null;
 } {
   let published = 0;
   let pendingTools: ToolUsed[] = [];
   const turns: SessionTurn[] = [];
   let hasCorrection = false;
   let lastTs: number | null = null;
+  let firstTs: number | null = null;
+  let preview: string | null = null;
 
   for (let idx = 0; idx < records.length; idx++) {
     const rec = records[idx];
@@ -83,7 +87,10 @@ function foldTurns(records: RawRecord[]): {
     if (role !== "User" && role !== "Assistant") continue;
 
     if (rec.user_action && rec.user_action !== "NONE") hasCorrection = true;
-    if (typeof rec.ts === "number") lastTs = rec.ts;
+    if (typeof rec.ts === "number") {
+      lastTs = rec.ts;
+      if (firstTs === null) firstTs = rec.ts;
+    }
 
     const turn: SessionTurn = {
       role,
@@ -96,10 +103,18 @@ function foldTurns(records: RawRecord[]): {
       turn.tools_used = pendingTools;
       pendingTools = [];
     }
+    if (
+      preview === null &&
+      role === "User" &&
+      typeof turn.content === "string" &&
+      turn.content.trim()
+    ) {
+      preview = turn.content.trim().slice(0, 240);
+    }
     turns.push(turn);
   }
 
-  return { turns, publishedUpTo: published, hasCorrection, lastTs };
+  return { turns, publishedUpTo: published, hasCorrection, lastTs, firstTs, preview };
 }
 
 export async function listSessions(): Promise<SessionSummary[]> {
@@ -116,18 +131,52 @@ export async function listSessions(): Promise<SessionSummary[]> {
     if (!entry.endsWith(".jsonl")) continue;
     const fullPath = path.join(dir, entry);
     const records = await readJsonl(fullPath).catch(() => []);
-    const { turns, publishedUpTo, hasCorrection, lastTs } = foldTurns(records);
+    const { turns, publishedUpTo, hasCorrection, lastTs, firstTs, preview } =
+      foldTurns(records);
     summaries.push({
       session_id: entry.replace(/\.jsonl$/, ""),
       turn_count: turns.length,
       has_correction: hasCorrection,
       last_activity: lastTs,
+      first_activity: firstTs,
       published_up_to: publishedUpTo,
+      preview,
       source: "local",
     });
   }
   summaries.sort((a, b) => (b.last_activity ?? 0) - (a.last_activity ?? 0));
   return summaries;
+}
+
+export async function deleteSession(sessionId: string): Promise<boolean> {
+  const file = path.join(stateDir(), `${sessionId}.jsonl`);
+  try {
+    await fs.unlink(file);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export async function deleteAllSessions(): Promise<number> {
+  const dir = stateDir();
+  let entries: string[];
+  try {
+    entries = await fs.readdir(dir);
+  } catch {
+    return 0;
+  }
+  let count = 0;
+  for (const entry of entries) {
+    if (!entry.endsWith(".jsonl")) continue;
+    try {
+      await fs.unlink(path.join(dir, entry));
+      count += 1;
+    } catch {
+      // ignore
+    }
+  }
+  return count;
 }
 
 export async function readSession(

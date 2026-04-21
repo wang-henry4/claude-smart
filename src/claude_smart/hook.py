@@ -14,6 +14,8 @@ import logging
 import sys
 from typing import Any, Callable
 
+from claude_smart.internal_call import is_internal_invocation
+
 _LOGGER = logging.getLogger(__name__)
 
 
@@ -70,6 +72,15 @@ def main(argv: list[str] | None = None) -> int:
 
     event = argv[0]
     payload = _read_stdin_json()
+
+    # Self-feedback guard: when this hook fires inside reflexio's own
+    # `claude -p` subprocess (the claude-code LLM provider), skip all
+    # handlers so we don't publish the extractor's system prompt back
+    # into reflexio. See claude_smart.internal_call for detection logic.
+    if is_internal_invocation(payload):
+        emit_continue()
+        return 0
+
     handlers = _load_handlers()
     handler = handlers.get(event)
     if handler is None:

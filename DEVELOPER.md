@@ -283,3 +283,12 @@ cd reflexio && uv run pytest tests/server/llm/ -q -o 'addopts='   # reflexio pat
 ```
 
 Run both locally before `make release`. There's no CI gate today — the release flow trusts the maintainer.
+
+### Exercising a hook handler directly
+
+Useful for debugging without a live Claude Code session:
+
+```bash
+echo '{"session_id":"dev-1","source":"startup","cwd":"'"$PWD"'"}' \
+  | uv run python -m claude_smart.hook session-start
+```

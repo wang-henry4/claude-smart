@@ -5,6 +5,7 @@ import Link from "next/link";
 import { BookOpen } from "lucide-react";
 import { PageHeader } from "@/components/common/page-header";
 import { EmptyState } from "@/components/common/empty-state";
+import { DeleteAllButton } from "@/components/common/delete-all-button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import {
@@ -115,6 +116,15 @@ export default function PlaybooksPage() {
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search"
               className="h-8 w-48 text-xs"
+            />
+            <DeleteAllButton
+              label={`Delete all${playbooks && playbooks.length > 0 ? ` (${playbooks.length})` : ""}`}
+              confirmMessage={`Delete ALL ${playbooks?.length ?? 0} playbooks across every project? This cannot be undone.`}
+              disabled={!playbooks || playbooks.length === 0}
+              onConfirm={async () => {
+                await reflexio.deleteAllUserPlaybooks(reflexioUrl);
+                setPlaybooks([]);
+              }}
             />
           </div>
         }

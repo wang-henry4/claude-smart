@@ -120,5 +120,8 @@ def handle(payload: dict[str, Any]) -> None:
 
     project_id = ids.resolve_project_id(payload.get("cwd"))
     publish.publish_unpublished(
-        session_id=session_id, project_id=project_id, force_extraction=False
+        session_id=session_id,
+        project_id=project_id,
+        force_extraction=False,
+        skip_aggregation=True,
     )

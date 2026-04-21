@@ -36,3 +36,23 @@ export function truncateId(id: string, prefix = 8, suffix = 4): string {
   if (id.length <= prefix + suffix + 1) return id;
   return `${id.slice(0, prefix)}…${id.slice(-suffix)}`;
 }
+
+export function dayBucket(ts: number | null | undefined): string {
+  if (!ts) return "Unknown";
+  const ms = ts < 1e12 ? ts * 1000 : ts;
+  const d = new Date(ms);
+  const now = new Date();
+  const startOfToday = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate(),
+  ).getTime();
+  const oneDay = 86_400_000;
+  if (d.getTime() >= startOfToday) return "Today";
+  if (d.getTime() >= startOfToday - oneDay) return "Yesterday";
+  if (d.getTime() >= startOfToday - 7 * oneDay) return "Earlier this week";
+  if (d.getFullYear() === now.getFullYear()) {
+    return d.toLocaleDateString(undefined, { month: "long" });
+  }
+  return d.toLocaleDateString(undefined, { year: "numeric", month: "long" });
+}

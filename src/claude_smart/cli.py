@@ -27,6 +27,10 @@ from claude_smart.reflexio_adapter import Adapter
 _REFLEXIO_ENV_PATH = Path.home() / ".reflexio" / ".env"
 _DEFAULT_MARKETPLACE_SOURCE = "ReflexioAI/claude-smart"
 _PLUGIN_SPEC = "claude-smart@reflexioai"
+_REFLEXIO_UNREACHABLE_MSG = (
+    "Failed to reach reflexio. Check ~/.claude-smart/backend.log "
+    "or restart Claude Code.\n"
+)
 
 
 def _latest_session_id() -> str | None:
@@ -94,12 +98,7 @@ def cmd_install(args: argparse.Namespace) -> int:
     if added:
         sys.stdout.write(f"Seeded {_REFLEXIO_ENV_PATH} with {', '.join(added)}.\n")
 
-    sys.stdout.write(
-        "\nclaude-smart installed. Next steps:\n"
-        "  1. Start the reflexio backend (leave it running in another terminal):\n"
-        "       uv run reflexio services start --only backend --no-reload\n"
-        "  2. Restart Claude Code in your project.\n"
-    )
+    sys.stdout.write("\nclaude-smart installed. Restart Claude Code in your project.\n")
     return 0
 
 
@@ -139,7 +138,10 @@ def cmd_learn(args: argparse.Namespace) -> int:
         return 0
     project_id = args.project or ids.resolve_project_id()
     status, count = publish.publish_unpublished(
-        session_id=session_id, project_id=project_id, force_extraction=True
+        session_id=session_id,
+        project_id=project_id,
+        force_extraction=True,
+        skip_aggregation=True,
     )
     if status == "nothing":
         sys.stdout.write(f"Session `{session_id}`: nothing to learn from.\n")
@@ -151,10 +153,7 @@ def cmd_learn(args: argparse.Namespace) -> int:
             "Extraction running.\n"
         )
         return 0
-    sys.stdout.write(
-        "Failed to reach reflexio. Check that the server is running "
-        "(`uv run reflexio services start`).\n"
-    )
+    sys.stdout.write(_REFLEXIO_UNREACHABLE_MSG)
     return 1
 
 
@@ -174,6 +173,55 @@ def cmd_tag(args: argparse.Namespace) -> int:
     )
     sys.stdout.write(f"Tagged correction on session `{session_id}`.\n")
     return 0
+
+
+def cmd_clear_all(args: argparse.Namespace) -> int:
+    """Delete all interactions, profiles, and user playbooks from reflexio.
+
+    Also removes local session JSONL buffers under ``state_dir()`` so
+    claude-smart starts from a clean slate. Requires ``--yes`` to proceed.
+
+    Args:
+        args (argparse.Namespace): Parsed CLI args. Honors ``args.yes``
+            (skip the confirmation prompt).
+
+    Returns:
+        int: 0 on success, 1 if reflexio is unreachable or the user aborts.
+    """
+    if not args.yes:
+        sys.stdout.write(
+            "This will permanently delete ALL interactions, profiles, and "
+            "user playbooks from reflexio, plus local session buffers under "
+            f"{state.state_dir()}.\nRe-run with --yes to confirm.\n"
+        )
+        return 1
+
+    result = Adapter().delete_all()
+    if result is None:
+        sys.stdout.write(_REFLEXIO_UNREACHABLE_MSG)
+        return 1
+    counts, errors = result
+
+    removed_buffers = 0
+    root = state.state_dir()
+    if root.is_dir():
+        for buf in root.glob("*.jsonl"):
+            try:
+                buf.unlink()
+                removed_buffers += 1
+            except OSError as exc:
+                sys.stderr.write(f"warning: could not remove {buf}: {exc}\n")
+
+    sys.stdout.write(
+        "Cleared reflexio: "
+        f"{counts.get('interactions', 0)} interactions, "
+        f"{counts.get('profiles', 0)} profiles, "
+        f"{counts.get('user_playbooks', 0)} user playbooks. "
+        f"Removed {removed_buffers} local session buffer(s).\n"
+    )
+    for entity, err in errors:
+        sys.stderr.write(f"warning: delete {entity} failed: {err}\n")
+    return 1 if errors else 0
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -208,6 +256,17 @@ def _build_parser() -> argparse.ArgumentParser:
     tg.add_argument("note", nargs="?", default="", help="Correction description")
     tg.add_argument("--session", help="Session id (defaults to latest)")
     tg.set_defaults(func=cmd_tag)
+
+    ca = sub.add_parser(
+        "clear-all",
+        help="Delete all interactions, profiles, and user playbooks from reflexio",
+    )
+    ca.add_argument(
+        "--yes",
+        action="store_true",
+        help="Confirm the destructive clear without prompting",
+    )
+    ca.set_defaults(func=cmd_clear_all)
     return parser
 
 

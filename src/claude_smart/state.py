@@ -32,6 +32,32 @@ _LOGGER = logging.getLogger(__name__)
 _ENV_STATE_DIR = "CLAUDE_SMART_STATE_DIR"
 _DEFAULT_STATE_DIR = Path.home() / ".claude-smart" / "sessions"
 
+_TOOL_DATA_FIELD_MAX_LEN = 2048
+
+
+def _truncate_tool_data_field(value: Any) -> Any:
+    """Truncate a single tool_data field value to ``_TOOL_DATA_FIELD_MAX_LEN``.
+
+    Only *top-level string* values are shortened. Nested containers
+    (dicts, lists) and non-string scalars pass through unchanged, even if
+    the container holds overlong strings — extractor prompts built from
+    this payload are bounded upstream by reflexio, and truncating a mid-
+    structure string risks producing invalid JSON when the caller later
+    serializes. The cap is intentionally generous (2048) so real `Bash`
+    commands, file paths, and `WebFetch` URLs survive intact; clipping
+    those mid-token actively degrades learning quality.
+
+    Args:
+        value (Any): A field value from the redacted tool_input dict.
+
+    Returns:
+        Any: The value truncated to ``_TOOL_DATA_FIELD_MAX_LEN`` chars if it
+            was an overlong string, otherwise the original value.
+    """
+    if isinstance(value, str) and len(value) > _TOOL_DATA_FIELD_MAX_LEN:
+        return value[:_TOOL_DATA_FIELD_MAX_LEN]
+    return value
+
 
 def state_dir() -> Path:
     """Root directory for session JSONL files. Honours ``CLAUDE_SMART_STATE_DIR``."""
@@ -115,7 +141,10 @@ def unpublished_slice(
                 "status": rec.get("status", "success"),
             }
             if tool_input:
-                tool_entry["tool_data"] = {"input": tool_input}
+                truncated_input = {
+                    k: _truncate_tool_data_field(v) for k, v in tool_input.items()
+                }
+                tool_entry["tool_data"] = {"input": truncated_input}
             pending_tools.append(tool_entry)
             continue
         if role in {"User", "Assistant"}:
