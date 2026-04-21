@@ -1,0 +1,17 @@
+{
+  "name": "yilu",
+  "owner": {
+    "name": "Yi Lu"
+  },
+  "metadata": {
+    "description": "claude-smart — self-improving Claude Code plugin via reflexio"
+  },
+  "plugins": [
+    {
+      "name": "claude-smart",
+      "version": "0.1.0",
+      "source": "./plugin",
+      "description": "Learns user corrections and project playbooks via reflexio — uses Claude Code itself as the LLM backend (no external API key required)"
+    }
+  ]
+}

@@ -1,0 +1,36 @@
+{
+  "name": "claude-smart",
+  "version": "0.1.0",
+  "description": "Self-improving Claude Code plugin — learns from corrections via reflexio",
+  "keywords": [
+    "claude",
+    "claude-code",
+    "plugin",
+    "reflexio",
+    "self-improvement",
+    "playbook",
+    "learning"
+  ],
+  "homepage": "https://github.com/yilu/claude-smart#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yilu/claude-smart.git"
+  },
+  "bugs": {
+    "url": "https://github.com/yilu/claude-smart/issues"
+  },
+  "license": "Apache-2.0",
+  "author": "Yi Lu",
+  "type": "commonjs",
+  "bin": {
+    "claude-smart": "bin/claude-smart.js"
+  },
+  "files": [
+    "bin",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

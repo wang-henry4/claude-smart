@@ -1,0 +1,52 @@
+#!/usr/bin/env bash
+# Dispatch a Claude Code hook event to the claude_smart Python package.
+# The plugin's CLAUDE_PLUGIN_ROOT lives at <repo>/plugin, so the Python
+# project root is one directory up. We invoke via `uv run --project` so
+# the reflexio path dep and pinned env from uv.lock are used.
+#
+# If the Setup hook recorded an install failure at
+# ~/.claude-smart/install-failed, short-circuit with a user-visible
+# message instead of trying to run uv and failing silently.
+set -eu
+
+EVENT="${1:-}"
+if [ -z "$EVENT" ]; then
+  echo '{"continue":true,"suppressOutput":true}'
+  exit 0
+fi
+
+HERE="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_ROOT="$(cd "$HERE/../.." && pwd)"
+
+FAILURE_MARKER="$HOME/.claude-smart/install-failed"
+if [ -f "$FAILURE_MARKER" ]; then
+  if [ "$EVENT" = "session-start" ] && command -v python3 >/dev/null 2>&1; then
+    python3 - "$FAILURE_MARKER" <<'PY'
+import json, pathlib, sys
+msg = pathlib.Path(sys.argv[1]).read_text().strip() or "unknown error"
+print(json.dumps({
+    "hookSpecificOutput": {
+        "hookEventName": "SessionStart",
+        "additionalContext": (
+            f"> **claude-smart is not installed correctly:** {msg}\n"
+            "> Re-run the plugin's Setup (restart Claude Code) "
+            "or fix the underlying issue and delete "
+            "`~/.claude-smart/install-failed` to retry."
+        ),
+    }
+}))
+PY
+  else
+    echo '{"continue":true,"suppressOutput":true}'
+  fi
+  exit 0
+fi
+
+if ! command -v uv >/dev/null 2>&1; then
+  # uv missing post-install → don't crash the session, just no-op.
+  echo '{"continue":true,"suppressOutput":true}'
+  exit 0
+fi
+
+# Stdin is the hook payload JSON — stream it through to the Python CLI.
+exec uv run --project "$PROJECT_ROOT" --quiet python -m claude_smart.hook "$EVENT"

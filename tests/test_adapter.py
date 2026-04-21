@@ -1,0 +1,223 @@
+"""Tests for the thin reflexio adapter."""
+
+from __future__ import annotations
+
+import time
+from types import SimpleNamespace
+from typing import Any
+
+from claude_smart import reflexio_adapter
+
+
+class _FakeClient:
+    """Minimal stand-in for ReflexioClient used in these tests."""
+
+    def __init__(
+        self,
+        *,
+        publish_ok: bool = True,
+        playbook_resp=None,
+        profile_resp=None,
+    ):
+        self._publish_ok = publish_ok
+        self._playbook_resp = playbook_resp
+        self._profile_resp = profile_resp
+        self.published_kwargs: dict[str, Any] = {}
+
+    def publish_interaction(self, **kwargs):
+        self.published_kwargs = kwargs
+        if not self._publish_ok:
+            raise RuntimeError("reflexio unreachable")
+
+    def search_user_playbooks(self, **_kw):
+        return self._playbook_resp
+
+    def search_profiles(self, **_kw):
+        return self._profile_resp
+
+
+def _adapter_with(client) -> reflexio_adapter.Adapter:
+    a = reflexio_adapter.Adapter()
+    a._client = client  # bypass lazy constructor
+    return a
+
+
+def test_publish_returns_true_on_success() -> None:
+    client = _FakeClient()
+    a = _adapter_with(client)
+    ok = a.publish(
+        session_id="s1",
+        project_id="p1",
+        interactions=[{"role": "User", "content": "hi"}],
+        force_extraction=True,
+    )
+    assert ok is True
+    assert client.published_kwargs["user_id"] == "s1"
+    assert client.published_kwargs["agent_version"] == "p1"
+    assert client.published_kwargs["force_extraction"] is True
+
+
+def test_publish_returns_false_when_client_raises() -> None:
+    a = _adapter_with(_FakeClient(publish_ok=False))
+    ok = a.publish(
+        session_id="s1",
+        project_id="p1",
+        interactions=[{"role": "User", "content": "hi"}],
+        force_extraction=False,
+    )
+    assert ok is False
+
+
+def test_publish_trivially_true_when_no_interactions() -> None:
+    a = _adapter_with(_FakeClient())
+    assert a.publish(session_id="s", project_id="p", interactions=[]) is True
+
+
+def test_fetch_playbooks_reads_user_playbooks_field() -> None:
+    resp = SimpleNamespace(user_playbooks=[{"content": "rule"}])
+    a = _adapter_with(_FakeClient(playbook_resp=resp))
+    assert a.fetch_project_playbooks("p1") == [{"content": "rule"}]
+
+
+def test_fetch_profiles_reads_user_profiles_field() -> None:
+    resp = SimpleNamespace(user_profiles=[{"content": "pref"}])
+    a = _adapter_with(_FakeClient(profile_resp=resp))
+    assert a.fetch_session_profiles("s1") == [{"content": "pref"}]
+
+
+def test_fetch_helpers_return_empty_on_unknown_shape() -> None:
+    a = _adapter_with(_FakeClient(playbook_resp=object(), profile_resp=object()))
+    assert a.fetch_project_playbooks("p1") == []
+    assert a.fetch_session_profiles("s1") == []
+
+
+def test_publish_returns_false_when_client_unavailable(monkeypatch) -> None:
+    a = reflexio_adapter.Adapter()
+    monkeypatch.setattr(a, "_get_client", lambda: None)
+    assert (
+        a.publish(
+            session_id="s",
+            project_id="p",
+            interactions=[{"role": "User", "content": "x"}],
+        )
+        is False
+    )
+
+
+# -----------------------------------------------------------------------------
+# Query-aware search
+# -----------------------------------------------------------------------------
+
+
+class _RecordingClient:
+    """Captures kwargs of every search call; returns the canned response."""
+
+    def __init__(self, *, playbook_resp=None, profile_resp=None):
+        self._playbook_resp = playbook_resp
+        self._profile_resp = profile_resp
+        self.playbook_kwargs: dict[str, Any] = {}
+        self.profile_kwargs: dict[str, Any] = {}
+
+    def search_user_playbooks(self, **kwargs):
+        self.playbook_kwargs = kwargs
+        return self._playbook_resp
+
+    def search_profiles(self, **kwargs):
+        self.profile_kwargs = kwargs
+        return self._profile_resp
+
+
+def test_search_playbooks_passes_query_and_hybrid_mode() -> None:
+    client = _RecordingClient(
+        playbook_resp=SimpleNamespace(user_playbooks=[{"content": "rule"}])
+    )
+    a = _adapter_with(client)
+    result = a.search_playbooks(project_id="proj", query="config.toml", top_k=3)
+    assert result == [{"content": "rule"}]
+    assert client.playbook_kwargs["agent_version"] == "proj"
+    assert client.playbook_kwargs["user_id"] is None
+    assert client.playbook_kwargs["query"] == "config.toml"
+    assert client.playbook_kwargs["top_k"] == 3
+    assert client.playbook_kwargs["search_mode"] == "hybrid"
+    assert client.playbook_kwargs["status_filter"] == [None]
+
+
+def test_search_profiles_scopes_to_session_id() -> None:
+    client = _RecordingClient(
+        profile_resp=SimpleNamespace(user_profiles=[{"content": "pref"}])
+    )
+    a = _adapter_with(client)
+    assert a.search_profiles(session_id="s1", query="q") == [{"content": "pref"}]
+    assert client.profile_kwargs["user_id"] == "s1"
+    assert client.profile_kwargs["query"] == "q"
+
+
+def test_search_both_returns_both_lists() -> None:
+    client = _RecordingClient(
+        playbook_resp=SimpleNamespace(user_playbooks=[{"content": "r"}]),
+        profile_resp=SimpleNamespace(user_profiles=[{"content": "p"}]),
+    )
+    a = _adapter_with(client)
+    playbooks, profiles = a.search_both(
+        project_id="proj", session_id="s1", query="q", top_k=2
+    )
+    assert playbooks == [{"content": "r"}]
+    assert profiles == [{"content": "p"}]
+    # Both legs see the same query.
+    assert client.playbook_kwargs["query"] == "q"
+    assert client.profile_kwargs["query"] == "q"
+
+
+def test_search_both_runs_legs_in_parallel() -> None:
+    """Serial would be ~0.4s; parallel should be ~0.2s."""
+
+    class SlowClient:
+        def search_user_playbooks(self, **_kw):
+            time.sleep(0.2)
+            return SimpleNamespace(user_playbooks=[])
+
+        def search_profiles(self, **_kw):
+            time.sleep(0.2)
+            return SimpleNamespace(user_profiles=[])
+
+    a = _adapter_with(SlowClient())
+    t0 = time.perf_counter()
+    a.search_both(project_id="p", session_id="s", query="q")
+    elapsed = time.perf_counter() - t0
+    assert elapsed < 0.35, f"legs did not run in parallel (elapsed={elapsed:.3f}s)"
+
+
+def test_search_both_absorbs_one_leg_failure() -> None:
+    class HalfBroken:
+        def search_user_playbooks(self, **_kw):
+            raise RuntimeError("playbook search down")
+
+        def search_profiles(self, **_kw):
+            return SimpleNamespace(user_profiles=[{"content": "p"}])
+
+    a = _adapter_with(HalfBroken())
+    playbooks, profiles = a.search_both(project_id="p", session_id="s", query="q")
+    assert playbooks == []
+    assert profiles == [{"content": "p"}]
+
+
+def test_fetch_both_parallelizes_broad_fetch() -> None:
+    client = _RecordingClient(
+        playbook_resp=SimpleNamespace(user_playbooks=[{"content": "r"}]),
+        profile_resp=SimpleNamespace(user_profiles=[{"content": "p"}]),
+    )
+    a = _adapter_with(client)
+    playbooks, profiles = a.fetch_both(project_id="proj", session_id="s1")
+    assert playbooks == [{"content": "r"}]
+    assert profiles == [{"content": "p"}]
+    # Broad fetch path does NOT set `query` — confirm the empty-query recency fallback is used.
+    assert "query" not in client.playbook_kwargs
+    assert client.profile_kwargs["query"] == ""
+
+
+def test_fetch_project_playbooks_default_top_k_is_tightened() -> None:
+    """SessionStart's broad inject used to be 50; narrowed because PreToolUse carries specificity."""
+    client = _RecordingClient(playbook_resp=SimpleNamespace(user_playbooks=[]))
+    a = _adapter_with(client)
+    a.fetch_project_playbooks("proj")
+    assert client.playbook_kwargs["top_k"] == 10

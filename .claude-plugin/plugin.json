@@ -1,0 +1,17 @@
+{
+  "name": "claude-smart",
+  "version": "0.1.0",
+  "description": "Self-improving Claude Code plugin — learns from corrections across sessions via reflexio",
+  "author": {
+    "name": "Yi Lu"
+  },
+  "keywords": [
+    "claude",
+    "claude-code",
+    "plugin",
+    "reflexio",
+    "self-improvement",
+    "playbook",
+    "learning"
+  ]
+}
