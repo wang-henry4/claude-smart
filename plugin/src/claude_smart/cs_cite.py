@@ -1,18 +1,31 @@
 """Support helpers for the ``cs-cite`` citation channel.
 
 Context injected at SessionStart / PreToolUse tags each playbook and
-profile bullet with a short stable id (``[cs:ab12]``). The injected
-instruction asks Claude to end impactful replies with a call like::
+profile bullet with a rank-based id fingerprinted by the underlying
+real id (``[cs:r1-1a2b]`` for the first playbook rule whose
+``user_playbook_id`` starts with ``1a2b``, ``[cs:p2-c3d4]`` for the
+second profile preference). The injected instruction asks Claude to
+end impactful replies with a call like::
 
-    cs-cite ab12,cd34
+    cs-cite p1-c3d4,r2-1a2b
 
 via the Bash tool. The Stop hook later scans the session transcript for
 those tool calls and resolves the ids against a per-session registry
 persisted at ``~/.claude-smart/sessions/<session_id>.injected.jsonl``.
 
+Why rank + fingerprint: rank alone resets at every injection, so a
+later injection's ``r1`` would silently overwrite an earlier entry in
+the append-only registry — if Claude cited ``r1`` across a turn
+boundary, the resolver would pick the wrong playbook. Appending the
+first four alphanumeric chars of the real id makes the id stable
+across injections in the common case (distinct real ids → distinct
+fingerprints), so cross-injection collisions become rare.
+
 This module holds:
 
-- ``short_id``: stable 4-hex-char id per (kind, content) pair.
+- ``rank_id``: ``p{n}-{fp}`` / ``r{n}-{fp}`` tag for a given
+  (kind, rank, real_id) tuple. Fingerprint is omitted when no real id
+  is available.
 - ``CITATION_CMD_RE``: regex matching a valid ``cs-cite`` command line.
 - ``ensure_installed``: idempotent copy of ``plugin/bin/cs-cite`` to
   ``~/.claude-smart/bin/cs-cite`` with the executable bit set.
@@ -22,12 +35,12 @@ This module holds:
 
 from __future__ import annotations
 
-import hashlib
 import logging
 import re
 import shutil
 import stat as stat_
 from pathlib import Path
+from typing import Any
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -37,53 +50,93 @@ _SOURCE_SCRIPT = _PLUGIN_ROOT / "bin" / "cs-cite"
 _INSTALL_DIR = Path.home() / ".claude-smart" / "bin"
 INSTALL_PATH = _INSTALL_DIR / "cs-cite"
 
-# Match a bare `cs-cite <ids>` invocation. Ids are 4-hex-char tokens,
-# optionally `cs:`-prefixed (since playbook items render as `[cs:ab12]`
-# and the model often copies the tag verbatim). The `(?i:cs:)` inline
-# flag makes only the prefix case-insensitive so `CS:AB12` is accepted
-# — matching the `re.IGNORECASE` used by the standalone `cs-cite`
-# script. Tokens may be comma- and/or whitespace-separated. Chained
-# commands (&&, |, ;) and extra trailing tokens remain rejected by the
-# anchored `\s*$` terminator so accidental mentions don't register as
-# citations.
-_ID_TOKEN = r"(?i:cs:)?[A-Fa-f0-9]{4}"
+_FINGERPRINT_LEN = 4
+
+# Match a bare `cs-cite <ids>` invocation. Ids are rank tokens of the
+# form `p<N>` (profile) or `r<N>` (playbook rule) with an optional
+# `-<fp>` fingerprint (1-4 alphanumeric chars), optionally
+# `cs:`-prefixed (since bullets render as `[cs:p1-ab12]` and the model
+# often copies the tag verbatim). The `(?i:...)` inline flags make the
+# prefix, kind letter, and fingerprint case-insensitive so `CS:P1-AB12`
+# is accepted — matching the `re.IGNORECASE` used by the standalone
+# `cs-cite` script. Tokens may be comma- and/or whitespace-separated.
+# Chained commands (&&, |, ;) and extra trailing tokens remain rejected
+# by the anchored `\s*$` terminator so accidental mentions don't
+# register as citations.
+_ID_TOKEN = r"(?i:cs:)?(?i:[pr])\d+(?:-(?i:[a-z0-9]){1,4})?"
 _ID_SEP = r"[,\s]+"
 CITATION_CMD_RE = re.compile(
     rf"^\s*(?:[^\s]*/)?cs-cite\s+({_ID_TOKEN}(?:{_ID_SEP}{_ID_TOKEN})*)\s*$"
 )
-_CLEAN_ID_RE = re.compile(r"^(?i:cs:)?([A-Fa-f0-9]{4})$")
+_CLEAN_ID_RE = re.compile(r"^(?i:cs:)?((?i:[pr])\d+(?:-(?i:[a-z0-9]){1,4})?)$")
 _SPLIT_RE = re.compile(_ID_SEP)
 
 CITATION_INSTRUCTION = (
     "_If any item above materially shaped this response, end your reply "
-    "with `cs-cite ab12,cd34` via the Bash tool — pass the 4-hex ids "
-    "from the `[cs:xxxx]` tags (e.g. for `[cs:ab12]` and `[cs:cd34]` run "
-    "`cs-cite ab12,cd34`; the `cs:` prefix is stripped automatically if "
-    "you include it). Ids only, no prose, one Bash call. Omit if none "
-    "applied._"
+    "with `cs-cite p1-ab12,r2-cd34` via the Bash tool — pass the full ids "
+    "from the `[cs:xxxx]` tags (e.g. for `[cs:p1-ab12]` and `[cs:r2-cd34]` "
+    "run `cs-cite p1-ab12,r2-cd34`; the `cs:` prefix is stripped "
+    "automatically if you include it). Use `p<N>-<fp>` for profile "
+    "preferences and `r<N>-<fp>` for playbook rules. Ids only, no prose, "
+    "one Bash call. Omit if none applied._"
 )
 
 
-def short_id(kind: str, content: str) -> str:
-    """Return a stable 4-hex-char id for a playbook or profile item.
+def _fingerprint(real_id: Any) -> str:
+    """Return the first ``_FINGERPRINT_LEN`` alphanumeric chars of ``real_id``.
 
-    The id is a prefix of ``sha1(f"{kind}:{content}")`` so the same item
-    injected across hooks or sessions receives the same tag. Four hex
-    chars yield 65,536 possible values, which gives a negligible
-    collision probability within the small registries (<= 25 items) that
-    a single session produces.
+    The fingerprint disambiguates rank ids across injections: two
+    injections both producing ``r1`` for different playbooks will still
+    yield distinct tags when their real ids have different prefixes.
 
     Args:
-        kind: ``"playbook"`` or ``"profile"`` — namespaces the hash so
-            two items with identical content but different kinds don't
-            collapse to the same id.
-        content: The rendered bullet content used for stability.
+        real_id: The underlying ``user_playbook_id`` or ``profile_id``.
+            Accepts anything ``str()`` handles (int, UUID, etc.).
+            ``None`` yields an empty string.
 
     Returns:
-        str: 4-character lowercase hex id.
+        str: Up to 4 lowercase alphanumeric chars; empty when the real
+            id has no alphanumeric characters or is ``None``.
     """
-    digest = hashlib.sha1(f"{kind}:{content}".encode("utf-8")).hexdigest()
-    return digest[:4]
+    if real_id is None:
+        return ""
+    return "".join(c for c in str(real_id).lower() if c.isalnum())[:_FINGERPRINT_LEN]
+
+
+def rank_id(kind: str, rank: int, real_id: Any = None) -> str:
+    """Return the citation id for a playbook or profile item.
+
+    Format is ``{letter}{rank}-{fingerprint}`` where ``letter`` is ``p``
+    for profiles and ``r`` for playbooks, ``rank`` is the 1-based
+    position within the current retrieval batch, and ``fingerprint`` is
+    up to 4 alphanumeric chars derived from ``real_id``. The fingerprint
+    is omitted when no real id is available (falling back to the rank
+    form ``r1`` / ``p1``).
+
+    Args:
+        kind: ``"playbook"`` or ``"profile"``. Unknown values raise
+            ``ValueError`` — callers never build registry entries for
+            other kinds.
+        rank: 1-based position within the retrieval batch.
+        real_id: The underlying ``user_playbook_id`` or ``profile_id``
+            used to derive the fingerprint suffix. Optional.
+
+    Returns:
+        str: ``p<rank>-<fp>`` for profiles, ``r<rank>-<fp>`` for
+            playbooks. Suffix is omitted when the real id yields no
+            alphanumeric fingerprint.
+
+    Raises:
+        ValueError: If ``kind`` is not ``"profile"`` or ``"playbook"``.
+    """
+    if kind == "profile":
+        prefix = "p"
+    elif kind == "playbook":
+        prefix = "r"
+    else:
+        raise ValueError(f"unknown citation kind: {kind!r}")
+    fp = _fingerprint(real_id)
+    return f"{prefix}{rank}-{fp}" if fp else f"{prefix}{rank}"
 
 
 def parse_citation_command(command: str) -> list[str]:
@@ -99,8 +152,9 @@ def parse_citation_command(command: str) -> list[str]:
             block.
 
     Returns:
-        list[str]: Lowercase 4-hex-char ids, in the order Claude cited
-            them. Empty when the command does not match.
+        list[str]: Lowercase rank ids (e.g. ``"p1"``, ``"r3"``), in the
+            order Claude cited them. Empty when the command does not
+            match.
     """
     match = CITATION_CMD_RE.match(command or "")
     if not match:

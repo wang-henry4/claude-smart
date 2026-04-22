@@ -61,6 +61,9 @@ function printHelp() {
       "Update:",
       "  npx claude-smart update                        Update to the latest version",
       "",
+      "Uninstall:",
+      "  npx claude-smart uninstall                     Remove the plugin from Claude Code",
+      "",
     ].join("\n"),
   );
 }
@@ -94,6 +97,35 @@ function runUpdate() {
   }
 
   process.stdout.write("\nclaude-smart updated. Restart Claude Code to apply.\n");
+}
+
+function runUninstall() {
+  if (!hasClaudeCli()) {
+    process.stderr.write(
+      "error: 'claude' CLI not found on PATH. " +
+        "Install Claude Code first: https://claude.com/claude-code\n",
+    );
+    process.exit(1);
+  }
+
+  try {
+    execFileSync("claude", ["plugin", "uninstall", PLUGIN_SPEC], { stdio: "inherit" });
+  } catch (err) {
+    const code = typeof err.status === "number" ? err.status : 1;
+    process.stderr.write(
+      `error: \`claude plugin uninstall ${PLUGIN_SPEC}\` failed (exit ${code})\n`,
+    );
+    process.exit(code);
+  }
+
+  process.stdout.write(
+    [
+      "",
+      "claude-smart uninstalled. Restart Claude Code to apply.",
+      "Local data in ~/.reflexio/ and ~/.claude-smart/ was left in place — remove manually if desired.",
+      "",
+    ].join("\n"),
+  );
 }
 
 function runInstall(args) {
@@ -157,6 +189,11 @@ function main() {
 
   if (cmd === "update") {
     runUpdate();
+    return;
+  }
+
+  if (cmd === "uninstall") {
+    runUninstall();
     return;
   }
 

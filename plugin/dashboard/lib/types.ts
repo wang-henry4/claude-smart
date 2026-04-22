@@ -19,6 +19,7 @@ export interface CitedItem {
   id: string;
   kind: "playbook" | "profile";
   title: string;
+  real_id?: string;
 }
 
 export interface Interaction {
