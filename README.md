@@ -56,22 +56,22 @@ Most memory solutions are still mostly informative—Claude remembers what happe
 
 Four ways this changes what Claude Code can do for you:
 
-- **Stop repeating the same mistakes:** Produces actionable playbooks Claude can follow next time; memory only records what happened.
+- 💡 **Stop repeating the same mistakes:** Produces actionable playbooks Claude can follow next time; memory only records what happened.
 
-  > *Example:* you tell Claude to stop running `npm test` without `--run` because watch mode hangs.
-  > **Memory:** “user was annoyed about npm test hanging”
+  > *Example:* you tell Claude to stop running `npm test` without `--run` because watch mode hangs.<br>
+  > **Memory:** “user was annoyed about npm test hanging”<br>
   > **Learning:** “always pass `--run` to `npm test` in this repo — default watch mode blocks CI”
 
-- **Start from the optimized path:** Preserves and optimizes successful execution paths so Claude can reuse what already works.
-  > *Example:* Claude spends several iterations trying to start the local dev environment before discovering that this repo requires `pnpm dev:all` instead of the usual `npm run dev`.
-  > **Memory:** “user mentioned that `npm run dev` did not work”
-  > **Learning:** “for this repo, always use `pnpm dev:all` to start the full local stack — `npm run dev` only starts the frontend and causes missing service errors”  
+- 🚀 **Start from the optimized path:** Preserves and optimizes execution paths so Claude can reuse what already works.
+  > *Example:* Claude spends several iterations trying to start the local dev environment before discovering that this repo requires `pnpm dev:all` instead of the usual `npm run dev`.<br>
+  > **Memory:** “user mentioned that `npm run dev` did not work”<br>
+  > **Learning:** “for this repo, always use `pnpm dev:all` to start the full local stack — `npm run dev` only starts the frontend and causes missing service errors”
 
-  Instead of re-exploring the same setup problem next time, Claude starts from the proven path—reducing planning steps, latency, and token usage.
+  Instead of re-exploring, Claude starts from the proven path—reducing planning steps, latency, and token usage.
 
-- **Project-wide, not session-siloed:** Session memory disappears with the conversation. The project playbook persists and improves across every session in that repo.
+- 🌐 **Project-wide, not session-siloed:** Session memory disappears with the conversation. The project playbook persists and improves across every session in that repo.
 
-- **Better context without prompt bloat:** Distilled, deduplicated playbooks stay in dozens of tokens—not thousands—even as the project grows.
+- 🪶 **Better context without prompt bloat:** Distilled, deduplicated playbooks stay in dozens of tokens—not thousands—even as the project grows.
 
 ---
 

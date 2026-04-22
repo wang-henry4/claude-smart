@@ -222,6 +222,8 @@ function CitedItemsRow({ items }: { items: CitedItem[] }) {
             <Link
               key={item.id}
               href={href}
+              target="_blank"
+              rel="noopener noreferrer"
               title={`${item.kind} • id=${targetId}`}
             >
               <Badge
