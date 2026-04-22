@@ -305,6 +305,29 @@ def cmd_restart(args: argparse.Namespace) -> int:
         elif not shutil.which("npm"):
             sys.stderr.write("warning: npm not on PATH; serving previous build\n")
         else:
+            next_bin = _DASHBOARD_DIR / "node_modules" / ".bin" / "next"
+            if not next_bin.exists():
+                sys.stdout.write(
+                    "Installing dashboard dependencies (npm install, may take a minute)…\n"
+                )
+                try:
+                    subprocess.run(
+                        ["npm", "install", "--no-audit", "--no-fund"],
+                        cwd=_DASHBOARD_DIR,
+                        check=True,
+                    )
+                except subprocess.CalledProcessError as exc:
+                    sys.stderr.write(
+                        f"error: npm install failed (exit {exc.returncode}); "
+                        "not starting dashboard.\n"
+                    )
+                    if do_backend:
+                        sys.stdout.write("Starting reflexio backend…\n")
+                        _run_service(_BACKEND_SCRIPT, "start")
+                        sys.stdout.write(
+                            f"reflexio backend: {_service_status(_BACKEND_SCRIPT)}\n"
+                        )
+                    return exc.returncode or 1
             sys.stdout.write(
                 "Rebuilding dashboard (npm run build, may take a minute)…\n"
             )

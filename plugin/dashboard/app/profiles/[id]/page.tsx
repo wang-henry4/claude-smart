@@ -15,11 +15,11 @@ import {
   Hash,
   Clock,
   CalendarClock,
-  User,
   FileText,
   Sparkles,
   Tags,
   Braces,
+  FolderGit2,
 } from "lucide-react";
 import { PageHeader } from "@/components/common/page-header";
 import { EmptyState } from "@/components/common/empty-state";
@@ -163,7 +163,7 @@ export default function ProfileDetailPage({
     <div className="flex-1 overflow-auto">
       <PageHeader
         title="Profile"
-        description="Session-scoped preference extracted by claude-smart."
+        description="Project-scoped preference extracted by claude-smart."
         actions={
           <div className="flex items-center gap-2">
             <Link href="/profiles">
@@ -216,8 +216,8 @@ export default function ProfileDetailPage({
               <div className="flex items-center gap-2 flex-wrap">
                 <StatusBadge status={status(profile)} />
                 <Badge variant="outline" className="font-mono gap-1.5">
-                  <User className="h-3 w-3" />
-                  {truncateId(profile.user_id, 8, 4)}
+                  <FolderGit2 className="h-3 w-3" />
+                  {truncateId(profile.user_id, 32, 8)}
                 </Badge>
                 {profile.source && (
                   <Badge variant="secondary" className="font-mono text-[10px]">
@@ -235,7 +235,7 @@ export default function ProfileDetailPage({
             <Section
               icon={Sparkles}
               title="Preference"
-              hint="Session-scoped preference. Reinjected if the same session is resumed; expires with profile_time_to_live."
+              hint="Project-scoped preference. Reinjected into future sessions in this project; expires with profile_time_to_live."
             >
               {editing ? (
                 <textarea
@@ -344,10 +344,10 @@ export default function ProfileDetailPage({
                     display={truncateId(profile.profile_id, 8, 4)}
                   />
                   <CopyMeta
-                    icon={User}
-                    label="User"
+                    icon={FolderGit2}
+                    label="Project"
                     value={profile.user_id}
-                    display={truncateId(profile.user_id, 8, 4)}
+                    display={truncateId(profile.user_id, 32, 8)}
                   />
                   {profile.generated_from_request_id && (
                     <CopyMeta

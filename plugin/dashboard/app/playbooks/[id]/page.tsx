@@ -40,6 +40,12 @@ function toForm(p: UserPlaybook): FormState {
   };
 }
 
+function displayName(name: string | null | undefined): string | null {
+  if (!name) return null;
+  if (name === "default_playbook_extractor") return "playbook";
+  return name;
+}
+
 function statusLabel(p: UserPlaybook): "CURRENT" | "ARCHIVED" | "PENDING" {
   if (!p.status) return "CURRENT";
   if (p.status === "ARCHIVED") return "ARCHIVED";
@@ -181,7 +187,7 @@ export default function PlaybookDetailPage({
   return (
     <div className="flex-1 overflow-auto">
       <PageHeader
-        title={playbook?.playbook_name || `Playbook #${id}`}
+        title={displayName(playbook?.playbook_name) || `Playbook #${id}`}
         description="Cross-session rule learned by claude-smart."
         actions={
           <div className="flex items-center gap-2">
@@ -242,9 +248,9 @@ export default function PlaybookDetailPage({
                   {playbook.agent_version || "default"}
                 </Badge>
                 <StatusBadge status={status!} />
-                {playbook.playbook_name && (
+                {displayName(playbook.playbook_name) && (
                   <Badge variant="secondary" className="font-mono text-[10px]">
-                    {playbook.playbook_name}
+                    {displayName(playbook.playbook_name)}
                   </Badge>
                 )}
                 {dirty && (
@@ -340,16 +346,15 @@ export default function PlaybookDetailPage({
                     value={formatTimestamp(playbook.created_at)}
                   />
                   <Meta
-                    icon={FolderGit2}
-                    label="Project"
+                    label="Agent"
                     value={playbook.agent_version || "default"}
                     mono
                   />
                   {playbook.user_id && (
                     <CopyMeta
-                      label="User"
+                      label="Project"
                       value={playbook.user_id}
-                      display={truncateId(playbook.user_id, 8, 4)}
+                      display={truncateId(playbook.user_id, 32, 8)}
                     />
                   )}
                   {playbook.request_id && (

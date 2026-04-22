@@ -262,9 +262,18 @@ Application startup complete.
 
 Health check: `curl http://localhost:8081/health` → `{"status":"healthy"}`. Stop with `uv run reflexio services stop`.
 
-### Step 5 — Point Claude Code at your working copy
+### Step 5 — Pick an install mode: local working copy vs. remote marketplace
 
-**Project-level** (scoped to one project — recommended for most dev work):
+`claude-smart` can be loaded two ways, and you can only have **one enabled at a time**. Claude Code merges `enabledPlugins` across user + project scopes, so enabling both spawns duplicate slash commands, duplicate SessionStart hooks, and a race on ports 8081 / 3001.
+
+| Mode | `enabledPlugins` key | Source | Use when |
+| --- | --- | --- | --- |
+| **Local** | `claude-smart@claude-smart-local` | `directory` → this repo | Iterating on plugin code, hooks, dashboard, or reflexio submodule |
+| **Remote** | `claude-smart@reflexioai` | GitHub `ReflexioAI/claude-smart` | Smoke-testing a published release; using the plugin in unrelated projects |
+
+#### Mode A — test the local working copy (recommended for dev in this repo)
+
+Write a project-scoped `.claude/settings.local.json` that adds a `directory` marketplace and disables the remote so it can't shadow the local copy:
 
 ```bash
 mkdir -p .claude
@@ -275,14 +284,17 @@ cat > .claude/settings.local.json <<JSON
       "source": { "source": "directory", "path": "$PWD" }
     }
   },
-  "enabledPlugins": { "claude-smart@claude-smart-local": true }
+  "enabledPlugins": {
+    "claude-smart@claude-smart-local": true,
+    "claude-smart@reflexioai": false
+  }
 }
 JSON
 ```
 
-**User-level** (all projects):
+The `"claude-smart@reflexioai": false` line explicitly overrides whatever is in `~/.claude/settings.json` for this project only — without it, both copies load side-by-side.
 
-Put the same JSON into `~/.claude/settings.json`, using an absolute path for `path`.
+**User-level** variant (all projects use the local copy): put the same JSON into `~/.claude/settings.json` with an absolute path, and drop the `@reflexioai: false` line since there's nothing to shadow anymore.
 
 Restart Claude Code. Changes to `plugin/` are picked up on the next session; changes to `plugin/src/claude_smart/` are picked up on the next hook invocation (hooks shell out via `uv run`, so editing the Python package takes effect immediately without a restart).
 
@@ -294,6 +306,60 @@ claude-smart restart           # from the shell
 ```
 
 Runs `backend-service.sh stop` and `dashboard-service.sh stop`, then `npm run build` in `plugin/dashboard/`, then starts both services again. Flags: `--skip-backend`, `--skip-dashboard`, `--no-rebuild` for partial restarts (e.g. `--no-rebuild` when only the reflexio Python source changed).
+
+#### Mode B — test the published remote plugin
+
+The remote marketplace is declared once at the user level:
+
+```bash
+# ~/.claude/settings.json
+{
+  "extraKnownMarketplaces": {
+    "reflexioai": { "source": { "source": "github", "repo": "ReflexioAI/claude-smart" } }
+  },
+  "enabledPlugins": { "claude-smart@reflexioai": true }
+}
+```
+
+In any repo **without** a local marketplace override, that's all you need. Pull the latest published version with either:
+
+```bash
+npx claude-smart update
+# or, directly:
+claude plugin update claude-smart@reflexioai
+```
+
+To force Mode B inside *this* repo (e.g. to verify a release candidate behaves the same way end users will see it), flip the project-scoped file:
+
+```jsonc
+// .claude/settings.local.json
+{
+  "enabledPlugins": {
+    "claude-smart@claude-smart-local": false,
+    "claude-smart@reflexioai": true
+  }
+}
+```
+
+Restart Claude Code.
+
+#### Verifying which mode is live
+
+Inside Claude Code, `/plugin` lists enabled plugins with their marketplace suffix. You should see **exactly one** `claude-smart@...` entry — if you see two, the scopes are stacking.
+
+From the shell, inspect both scopes directly:
+
+```bash
+jq '.enabledPlugins' ~/.claude/settings.json
+jq '.enabledPlugins' .claude/settings.local.json 2>/dev/null
+```
+
+And confirm the loaded plugin's on-disk location:
+
+```bash
+ls -la ~/.claude/plugins/cache/reflexioai/claude-smart/    # Mode B only
+ls -la "$PWD/plugin"                                       # Mode A source of truth
+```
 
 ### Step 6 — Sanity check
 

@@ -47,7 +47,7 @@ export default function ProfilesPage() {
     <div className="flex-1 overflow-auto">
       <PageHeader
         title="Profiles"
-        description="Session-scoped user preferences extracted from interactions."
+        description="Project-scoped preferences extracted from interactions."
         actions={
           <div className="flex items-center gap-2">
             <Input
@@ -95,7 +95,7 @@ export default function ProfilesPage() {
                 <header className="flex items-center justify-between gap-2 mb-2">
                   <div className="flex items-center gap-2 min-w-0">
                     <Badge variant="outline" className="h-5 font-mono text-[10px]">
-                      {truncateId(p.user_id, 6, 4)}
+                      {truncateId(p.user_id, 32, 8)}
                     </Badge>
                     {p.status && (
                       <Badge variant="secondary" className="h-5 text-[10px]">

@@ -248,7 +248,7 @@ function TurnMeta({ ts, userId }: { ts?: number; userId?: string }) {
             <span>Project</span>
           </dt>
           <dd className="flex items-center gap-1">
-            <code className="font-mono">{truncateId(userId, 8, 4)}</code>
+            <code className="font-mono">{truncateId(userId, 32, 8)}</code>
             <CopyButton value={userId} />
           </dd>
         </div>
