@@ -152,13 +152,16 @@ def _format_playbooks(
 ) -> tuple[list[str], list[dict[str, Any]]]:
     lines: list[str] = []
     entries: list[dict[str, Any]] = []
+    rank = 0
     for pb in playbooks:
         content = _first_nonempty(_field(pb, "content"))
         if not content:
             continue
+        rank += 1
         trigger = _first_nonempty(_field(pb, "trigger"))
         rationale = _first_nonempty(_field(pb, "rationale"))
-        item_id = cs_cite.short_id("playbook", content)
+        real_id = _field(pb, "user_playbook_id")
+        item_id = cs_cite.rank_id("playbook", rank, real_id)
         title = _title_from_content(content)
         bullet = f"- [cs:{item_id}] {content}"
         if trigger:
@@ -172,6 +175,7 @@ def _format_playbooks(
                 "kind": "playbook",
                 "title": title,
                 "content": content,
+                "real_id": str(real_id) if real_id is not None else None,
             }
         )
     return lines, entries
@@ -182,11 +186,14 @@ def _format_profiles(
 ) -> tuple[list[str], list[dict[str, Any]]]:
     lines: list[str] = []
     entries: list[dict[str, Any]] = []
+    rank = 0
     for p in profiles:
         content = _first_nonempty(_field(p, "content"))
         if not content:
             continue
-        item_id = cs_cite.short_id("profile", content)
+        rank += 1
+        real_id = _field(p, "profile_id")
+        item_id = cs_cite.rank_id("profile", rank, real_id)
         title = _title_from_content(content)
         lines.append(f"- [cs:{item_id}] {content}")
         entries.append(
@@ -195,6 +202,7 @@ def _format_profiles(
                 "kind": "profile",
                 "title": title,
                 "content": content,
+                "real_id": str(real_id) if real_id is not None else None,
             }
         )
     return lines, entries

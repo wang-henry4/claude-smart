@@ -212,16 +212,27 @@ function CitedItemsRow({ items }: { items: CitedItem[] }) {
       <Sparkles className="h-3.5 w-3.5 mt-0.5 text-amber-500 shrink-0" />
       <div className="flex items-center gap-1 flex-wrap">
         <span className="text-muted-foreground">Used</span>
-        {items.map((item) => (
-          <Badge
-            key={item.id}
-            variant="outline"
-            className="h-5 gap-1 text-[10px] border-amber-500/40"
-            title={`${item.kind} • id=${item.id}`}
-          >
-            {item.title || item.id}
-          </Badge>
-        ))}
+        {items.map((item) => {
+          const targetId = item.real_id ?? item.id;
+          const href =
+            item.kind === "playbook"
+              ? `/playbooks/${encodeURIComponent(targetId)}`
+              : `/profiles/${encodeURIComponent(targetId)}`;
+          return (
+            <Link
+              key={item.id}
+              href={href}
+              title={`${item.kind} • id=${targetId}`}
+            >
+              <Badge
+                variant="outline"
+                className="h-5 gap-1 text-[10px] border-amber-500/40 cursor-pointer hover:bg-amber-500/10 hover:border-amber-500/70 transition-colors"
+              >
+                {item.title || item.id}
+              </Badge>
+            </Link>
+          );
+        })}
       </div>
     </div>
   );

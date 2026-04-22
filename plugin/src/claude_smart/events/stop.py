@@ -150,8 +150,8 @@ def _scan_transcript_for_cs_cite_ids(path: Path) -> list[str]:
         path (Path): Absolute path to the transcript JSONL.
 
     Returns:
-        list[str]: 4-hex-char ids in emission order. Empty when no
-            ``cs-cite`` call is found.
+        list[str]: Rank ids (e.g. ``"r1-ab12"``, ``"p2-cd34"``) in
+            emission order. Empty when no ``cs-cite`` call is found.
     """
     out: list[str] = []
     for entry in _iter_current_turn_assistant_entries(path):
@@ -198,13 +198,15 @@ def _resolve_cited_items(session_id: str, cited_ids: list[str]) -> list[dict[str
         if not entry:
             continue
         seen.add(cid)
-        resolved.append(
-            {
-                "id": entry.get("id", cid),
-                "kind": entry.get("kind", ""),
-                "title": entry.get("title", ""),
-            }
-        )
+        item: dict[str, Any] = {
+            "id": entry.get("id", cid),
+            "kind": entry.get("kind", ""),
+            "title": entry.get("title", ""),
+        }
+        real_id = entry.get("real_id")
+        if real_id:
+            item["real_id"] = real_id
+        resolved.append(item)
     return resolved
 
 

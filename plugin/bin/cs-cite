@@ -11,16 +11,19 @@ sidecar file, no state.
 Usage:
     cs-cite <id> [<id>...]            # space- or comma-separated
 
-Accepts one or more 4-hex-char ids as arguments, separated by commas
-and/or whitespace. An optional ``cs:`` prefix is stripped for
-convenience, since playbook items render as ``[cs:ab12]`` and the model
-often copies the tag verbatim. Case is normalized to lowercase.
+Accepts one or more rank ids: ``p<N>[-<fp>]`` for profile preferences
+and ``r<N>[-<fp>]`` for playbook rules, as emitted in ``[cs:p1-ab12]``
+/ ``[cs:r2-cd34]`` tags. The optional ``-<fp>`` suffix is a 1–4 char
+alphanumeric fingerprint of the underlying real id. Tokens may be
+separated by commas and/or whitespace. An optional ``cs:`` prefix is
+stripped for convenience since the model often copies the tag
+verbatim. Case is normalized to lowercase.
 
 Examples:
-    cs-cite ab12              -> ✨ used 1 claude-smart learning
-    cs-cite ab12,cd34         -> ✨ used 2 claude-smart learnings
-    cs-cite cs:ab12,cs:cd34   -> ✨ used 2 claude-smart learnings
-    cs-cite ab12 cd34         -> ✨ used 2 claude-smart learnings
+    cs-cite p1-ab12                 -> ✨ used 1 claude-smart learning
+    cs-cite p1-ab12,r2-cd34         -> ✨ used 2 claude-smart learnings
+    cs-cite cs:p1-ab12,cs:r2-cd34   -> ✨ used 2 claude-smart learnings
+    cs-cite p1-ab12 r2-cd34         -> ✨ used 2 claude-smart learnings
 """
 
 from __future__ import annotations
@@ -28,11 +31,11 @@ from __future__ import annotations
 import re
 import sys
 
-_TOKEN_RE = re.compile(r"^(?:cs:)?([a-f0-9]{4})$", re.IGNORECASE)
+_TOKEN_RE = re.compile(r"^(?:cs:)?([pr]\d+(?:-[a-z0-9]{1,4})?)$", re.IGNORECASE)
 _SPLIT_RE = re.compile(r"[,\s]+")
 _USAGE = (
-    "cs-cite: expected one or more 4-hex-char ids "
-    "(e.g. `cs-cite ab12,cd34` or `cs-cite cs:ab12`)\n"
+    "cs-cite: expected one or more rank ids "
+    "(e.g. `cs-cite p1-ab12,r2-cd34` or `cs-cite cs:p1-ab12`)\n"
 )
 
 
@@ -59,8 +62,8 @@ def main() -> int:
             bad.append(tok)
     if bad:
         sys.stderr.write(
-            "cs-cite: ignoring invalid tokens (expected 4-hex-char ids, "
-            f"optionally 'cs:'-prefixed): {', '.join(bad)}\n"
+            "cs-cite: ignoring invalid tokens (expected rank ids like "
+            f"`p1` or `r2`, optionally 'cs:'-prefixed): {', '.join(bad)}\n"
         )
     if not ids:
         sys.stderr.write(_USAGE)

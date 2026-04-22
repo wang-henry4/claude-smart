@@ -433,17 +433,19 @@ def _prime_injected_registry(session_id: str) -> None:
         session_id,
         [
             {
-                "id": "ab12",
+                "id": "r1-42",
                 "kind": "playbook",
                 "title": "use pathlib",
                 "content": "use pathlib",
+                "real_id": "42",
                 "ts": 0,
             },
             {
-                "id": "cd34",
+                "id": "p1-uuid",
                 "kind": "profile",
                 "title": "prefers anyio",
                 "content": "prefers anyio",
+                "real_id": "uuid-anyio",
                 "ts": 0,
             },
         ],
@@ -455,7 +457,7 @@ def test_stop_records_cs_cite_ids_as_cited_items(
 ) -> None:
     """A single cs-cite call resolves ids against the session registry."""
     _prime_injected_registry("s1")
-    transcript = _transcript_with_cs_cite_call(tmp_path, "cs-cite ab12,cd34")
+    transcript = _transcript_with_cs_cite_call(tmp_path, "cs-cite r1-42,p1-uuid")
     monkeypatch.setattr(
         "claude_smart.publish.publish_unpublished", lambda **_: ("nothing", 0)
     )
@@ -464,8 +466,13 @@ def test_stop_records_cs_cite_ids_as_cited_items(
     assert records[-1]["role"] == "Assistant"
     cited = records[-1].get("cited_items")
     assert cited == [
-        {"id": "ab12", "kind": "playbook", "title": "use pathlib"},
-        {"id": "cd34", "kind": "profile", "title": "prefers anyio"},
+        {"id": "r1-42", "kind": "playbook", "title": "use pathlib", "real_id": "42"},
+        {
+            "id": "p1-uuid",
+            "kind": "profile",
+            "title": "prefers anyio",
+            "real_id": "uuid-anyio",
+        },
     ]
 
 
@@ -495,7 +502,7 @@ def test_stop_omits_cited_items_when_no_cs_cite_call(
 def test_stop_drops_unknown_cs_cite_ids(session_dir, tmp_path, monkeypatch) -> None:
     """Ids not present in the session registry are silently dropped."""
     _prime_injected_registry("s1")
-    transcript = _transcript_with_cs_cite_call(tmp_path, "cs-cite ab12,ffff")
+    transcript = _transcript_with_cs_cite_call(tmp_path, "cs-cite r1-42,r9-ffff")
     monkeypatch.setattr(
         "claude_smart.publish.publish_unpublished", lambda **_: ("nothing", 0)
     )
@@ -503,7 +510,7 @@ def test_stop_drops_unknown_cs_cite_ids(session_dir, tmp_path, monkeypatch) -> N
     records = state.read_all("s1")
     cited = records[-1].get("cited_items")
     assert cited == [
-        {"id": "ab12", "kind": "playbook", "title": "use pathlib"},
+        {"id": "r1-42", "kind": "playbook", "title": "use pathlib", "real_id": "42"},
     ]
 
 
@@ -523,7 +530,7 @@ def test_stop_merges_multiple_cs_cite_calls_dedup(
                         {
                             "type": "tool_use",
                             "name": "Bash",
-                            "input": {"command": "cs-cite ab12"},
+                            "input": {"command": "cs-cite r1-42"},
                         }
                     ]
                 },
@@ -535,7 +542,7 @@ def test_stop_merges_multiple_cs_cite_calls_dedup(
                         {
                             "type": "tool_use",
                             "name": "Bash",
-                            "input": {"command": "cs-cite ab12,cd34"},
+                            "input": {"command": "cs-cite r1-42,p1-uuid"},
                         }
                     ]
                 },
@@ -549,8 +556,13 @@ def test_stop_merges_multiple_cs_cite_calls_dedup(
     records = state.read_all("s1")
     cited = records[-1].get("cited_items")
     assert cited == [
-        {"id": "ab12", "kind": "playbook", "title": "use pathlib"},
-        {"id": "cd34", "kind": "profile", "title": "prefers anyio"},
+        {"id": "r1-42", "kind": "playbook", "title": "use pathlib", "real_id": "42"},
+        {
+            "id": "p1-uuid",
+            "kind": "profile",
+            "title": "prefers anyio",
+            "real_id": "uuid-anyio",
+        },
     ]
 
 
@@ -564,7 +576,7 @@ def test_stop_rejects_chained_cs_cite_commands(
     bare ``cs-cite <ids>`` invocation.
     """
     _prime_injected_registry("s1")
-    transcript = _transcript_with_cs_cite_call(tmp_path, "cs-cite ab12 && echo done")
+    transcript = _transcript_with_cs_cite_call(tmp_path, "cs-cite r1-42 && echo done")
     monkeypatch.setattr(
         "claude_smart.publish.publish_unpublished", lambda **_: ("nothing", 0)
     )
@@ -589,7 +601,7 @@ def test_stop_citation_without_prior_registry_drops_all_ids(
     session_dir, tmp_path, monkeypatch
 ) -> None:
     """Citation with no ``.injected.jsonl`` (e.g. resumed session) → all ids drop."""
-    transcript = _transcript_with_cs_cite_call(tmp_path, "cs-cite ab12")
+    transcript = _transcript_with_cs_cite_call(tmp_path, "cs-cite r1-42")
     monkeypatch.setattr(
         "claude_smart.publish.publish_unpublished", lambda **_: ("nothing", 0)
     )

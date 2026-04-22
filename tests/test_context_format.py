@@ -25,19 +25,68 @@ def test_render_with_registry_empty_content_items_ignored() -> None:
 
 
 def test_render_with_registry_ids_match_between_markdown_and_registry() -> None:
-    pbs = [{"content": "use pathlib"}]
-    prs = [{"content": "prefers anyio"}]
+    pbs = [{"content": "use pathlib", "user_playbook_id": 17}]
+    prs = [{"content": "prefers anyio", "profile_id": "uuid-profile-1"}]
     md, registry = context_format.render_with_registry(
         project_id="demo", playbooks=pbs, profiles=prs
     )
-    pb_id = cs_cite.short_id("playbook", "use pathlib")
-    pr_id = cs_cite.short_id("profile", "prefers anyio")
-    assert f"[cs:{pb_id}]" in md
-    assert f"[cs:{pr_id}]" in md
-    assert {e["id"] for e in registry} == {pb_id, pr_id}
-    kinds = {e["id"]: e["kind"] for e in registry}
-    assert kinds[pb_id] == "playbook"
-    assert kinds[pr_id] == "profile"
+    assert "[cs:r1-17]" in md
+    assert "[cs:p1-uuid]" in md
+    assert {e["id"] for e in registry} == {"r1-17", "p1-uuid"}
+    by_id = {e["id"]: e for e in registry}
+    assert by_id["r1-17"]["kind"] == "playbook"
+    assert by_id["p1-uuid"]["kind"] == "profile"
+    assert by_id["r1-17"]["real_id"] == "17"
+    assert by_id["p1-uuid"]["real_id"] == "uuid-profile-1"
+
+
+def test_render_with_registry_ranks_increase_in_order() -> None:
+    """Rank ids reflect retrieval order within each kind."""
+    pbs = [
+        {"content": "first rule", "user_playbook_id": 1},
+        {"content": "second rule", "user_playbook_id": 2},
+    ]
+    prs = [
+        {"content": "first pref", "profile_id": "a"},
+        {"content": "second pref", "profile_id": "b"},
+    ]
+    md, registry = context_format.render_with_registry(
+        project_id="demo", playbooks=pbs, profiles=prs
+    )
+    assert "[cs:r1-1] first rule" in md
+    assert "[cs:r2-2] second rule" in md
+    assert "[cs:p1-a] first pref" in md
+    assert "[cs:p2-b] second pref" in md
+    assert [e["id"] for e in registry] == ["r1-1", "r2-2", "p1-a", "p2-b"]
+
+
+def test_render_with_registry_omits_fingerprint_when_real_id_missing() -> None:
+    """Items without a real id render as bare ranks (back-compat path)."""
+    pbs = [{"content": "orphan rule"}]
+    prs = [{"content": "orphan pref"}]
+    md, registry = context_format.render_with_registry(
+        project_id="demo", playbooks=pbs, profiles=prs
+    )
+    assert "[cs:r1] orphan rule" in md
+    assert "[cs:p1] orphan pref" in md
+    ids = {e["id"] for e in registry}
+    assert ids == {"r1", "p1"}
+
+
+def test_render_with_registry_fingerprint_disambiguates_same_rank() -> None:
+    """Two renders with the same rank but different real ids → distinct tags."""
+    md_a, _ = context_format.render_with_registry(
+        project_id="demo",
+        playbooks=[{"content": "rule A", "user_playbook_id": 100}],
+        profiles=[],
+    )
+    md_b, _ = context_format.render_with_registry(
+        project_id="demo",
+        playbooks=[{"content": "rule B", "user_playbook_id": 200}],
+        profiles=[],
+    )
+    assert "[cs:r1-100]" in md_a
+    assert "[cs:r1-200]" in md_b
 
 
 def test_render_with_registry_emits_citation_instruction() -> None:
