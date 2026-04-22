@@ -17,7 +17,8 @@
         check-version check-clean
 
 VERSION_FILES := package.json plugin/pyproject.toml \
-                 plugin/.claude-plugin/plugin.json .claude-plugin/marketplace.json
+                 plugin/.claude-plugin/plugin.json .claude-plugin/marketplace.json \
+                 README.md
 
 help:
 	@awk 'BEGIN{FS=":.*##"} /^[a-zA-Z_-]+:.*##/{printf "  %-20s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -38,8 +39,10 @@ bump: check-version ## Rewrite version in all 4 manifests
 	@sed -i.bak -E 's/"version": "[^"]+"/"version": "$(VERSION)"/' \
 	    package.json plugin/.claude-plugin/plugin.json .claude-plugin/marketplace.json
 	@sed -i.bak -E 's/^version = "[^"]+"/version = "$(VERSION)"/' plugin/pyproject.toml
+	@sed -i.bak -E 's|badge/version-[0-9]+\.[0-9]+\.[0-9]+([.-][A-Za-z0-9.-]+)?-green\.svg|badge/version-$(VERSION)-green.svg|' README.md
 	@rm -f package.json.bak plugin/pyproject.toml.bak \
-	       plugin/.claude-plugin/plugin.json.bak .claude-plugin/marketplace.json.bak
+	       plugin/.claude-plugin/plugin.json.bak .claude-plugin/marketplace.json.bak \
+	       README.md.bak
 	@echo "→ resulting versions:"
 	@grep -HE '("version"|^version)' $(VERSION_FILES)
 

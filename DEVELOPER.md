@@ -126,6 +126,16 @@ make publish-dry
 
 `make help` prints the full target list.
 
+### How users pick up the new release
+
+Once published, end users update to the latest version with either:
+
+```bash
+npx claude-smart update     # or: uvx claude-smart update
+```
+
+Both wrap `claude plugin update claude-smart@reflexioai`. Users restart Claude Code to apply.
+
 ## Pre-release checklist
 
 Before running `make release`:

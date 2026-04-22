@@ -58,6 +58,9 @@ function printHelp() {
       "  3. Appends CLAUDE_SMART_USE_LOCAL_CLI=1 and CLAUDE_SMART_USE_LOCAL_EMBEDDING=1",
       "     to ~/.reflexio/.env (idempotent).",
       "",
+      "Update:",
+      "  npx claude-smart update                        Update to the latest version",
+      "",
     ].join("\n"),
   );
 }
@@ -71,6 +74,26 @@ function parseSource(args) {
     process.exit(1);
   }
   return value;
+}
+
+function runUpdate() {
+  if (!hasClaudeCli()) {
+    process.stderr.write(
+      "error: 'claude' CLI not found on PATH. " +
+        "Install Claude Code first: https://claude.com/claude-code\n",
+    );
+    process.exit(1);
+  }
+
+  try {
+    execFileSync("claude", ["plugin", "update", PLUGIN_SPEC], { stdio: "inherit" });
+  } catch (err) {
+    const code = typeof err.status === "number" ? err.status : 1;
+    process.stderr.write(`error: \`claude plugin update ${PLUGIN_SPEC}\` failed (exit ${code})\n`);
+    process.exit(code);
+  }
+
+  process.stdout.write("\nclaude-smart updated. Restart Claude Code to apply.\n");
 }
 
 function runInstall(args) {
@@ -129,6 +152,11 @@ function main() {
 
   if (cmd === "install") {
     runInstall(args.slice(1));
+    return;
+  }
+
+  if (cmd === "update") {
+    runUpdate();
     return;
   }
 

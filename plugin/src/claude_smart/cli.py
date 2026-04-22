@@ -1,9 +1,11 @@
 """User-facing CLI for claude-smart.
 
-Exposes four subcommands:
+Exposes five subcommands:
 
 - ``install``: register the GitHub marketplace and install the plugin into
   Claude Code, then seed ``~/.reflexio/.env`` with the local-provider flags.
+- ``update``: update the plugin to the latest version via the native Claude
+  Code plugin CLI.
 - ``show``: print the current project playbook and session user profiles
   (as markdown).
 - ``learn``: force reflexio to run extraction on all unpublished interactions.
@@ -99,6 +101,35 @@ def cmd_install(args: argparse.Namespace) -> int:
         sys.stdout.write(f"Seeded {_REFLEXIO_ENV_PATH} with {', '.join(added)}.\n")
 
     sys.stdout.write("\nclaude-smart installed. Restart Claude Code in your project.\n")
+    return 0
+
+
+def cmd_update(_args: argparse.Namespace) -> int:
+    """Update claude-smart to the latest version via the native plugin CLI.
+
+    Runs ``claude plugin update claude-smart@reflexioai``.
+
+    Args:
+        args (argparse.Namespace): Parsed CLI args (unused).
+
+    Returns:
+        int: 0 on success, non-zero if the ``claude`` CLI is missing or fails.
+    """
+    if not shutil.which("claude"):
+        sys.stderr.write(
+            "error: 'claude' CLI not found on PATH. "
+            "Install Claude Code first: https://claude.com/claude-code\n"
+        )
+        return 1
+
+    cmd = ["claude", "plugin", "update", _PLUGIN_SPEC]
+    try:
+        subprocess.run(cmd, check=True)
+    except subprocess.CalledProcessError as exc:
+        sys.stderr.write(f"error: {' '.join(cmd)} failed (exit {exc.returncode})\n")
+        return exc.returncode or 1
+
+    sys.stdout.write("\nclaude-smart updated. Restart Claude Code to apply.\n")
     return 0
 
 
@@ -235,6 +266,9 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Marketplace ref — GitHub owner/repo, or a local directory path",
     )
     inst.set_defaults(func=cmd_install)
+
+    upd = sub.add_parser("update", help="Update claude-smart to the latest version")
+    upd.set_defaults(func=cmd_update)
 
     sh = sub.add_parser(
         "show",
