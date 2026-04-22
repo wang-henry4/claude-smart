@@ -8,6 +8,7 @@ Internal notes for maintainers of `claude-smart`. End-user install instructions 
 | --- | --- |
 | `plugin/` | Claude Code plugin — hooks, slash commands, install script, and the Python package |
 | `plugin/src/claude_smart/` | Python package — hook handler, CLI, reflexio adapter |
+| `plugin/bin/` | User-invoked helper scripts (e.g. `cs-cite`) installed into `~/.claude-smart/bin/` at runtime |
 | `plugin/pyproject.toml` | Python manifest — shipped to PyPI via `uv build --project plugin` |
 | `tests/` | Pytest suite for the Python package (run via `uv run --project plugin pytest tests/ -q` from repo root) |
 | `bin/claude-smart.js` | Node wrapper so `npx claude-smart install` works |
@@ -17,6 +18,29 @@ Internal notes for maintainers of `claude-smart`. End-user install instructions 
 | `reflexio/` | Submodule — Apache 2.0, storage + search + extraction backend |
 | `plugin/dashboard/` | Next.js management UI for interactions, profiles, playbooks, configuration |
 | `Makefile` | Release automation |
+
+## Environment variables
+
+Tunables read by the plugin at runtime. Most users don't need to touch these — the installer writes the local-provider flags to `~/.reflexio/.env` and sensible defaults cover the rest.
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `CLAUDE_SMART_USE_LOCAL_CLI` | `0` (installer sets `1`) | Route generation through the local `claude` CLI. Written to `~/.reflexio/.env` by `claude-smart install`. |
+| `CLAUDE_SMART_USE_LOCAL_EMBEDDING` | `0` (installer sets `1`) | Use the in-process ONNX embedder (requires `chromadb`). Written to `~/.reflexio/.env` by `claude-smart install`. |
+| `CLAUDE_SMART_CLI_PATH` | `shutil.which("claude")` | Override the path to the `claude` binary. |
+| `CLAUDE_SMART_CLI_TIMEOUT` | `120` | Per-call subprocess timeout (seconds). Raise for slow prompts. |
+| `CLAUDE_SMART_STATE_DIR` | `~/.claude-smart/sessions/` | Where the per-session JSONL buffer lives. |
+| `CLAUDE_SMART_BACKEND_AUTOSTART` | `1` | Set to `0` to stop the SessionStart hook from spawning the reflexio backend on `localhost:8081`. |
+| `CLAUDE_SMART_DASHBOARD_AUTOSTART` | `1` | Set to `0` to stop the SessionStart hook from spawning the Next.js dashboard on `localhost:3001`. |
+| `CLAUDE_SMART_BACKEND_STOP_ON_END` | `0` | Set to `1` to tear down the backend at `SessionEnd` instead of leaving it long-lived. |
+| `REFLEXIO_URL` | `http://localhost:8081/` | Point the plugin at a non-local reflexio backend. |
+
+## Scope: profile vs. playbook
+
+Both profiles and playbooks are project-scoped (since the 88cb150 refactor), identified by the git-toplevel basename of the working directory. What differs is the extractor channel and the shape of the record:
+
+- **Profile** (reflexio's `user_id = project_id`) — personal preferences ("prefers anyio over asyncio"). Free-form bullets.
+- **Playbook** (reflexio's `agent_version = project_id`) — project-specific rules with trigger and rationale ("when writing a script, use pathlib — os.path is error-prone").
 
 ## Dashboard
 
@@ -261,6 +285,15 @@ JSON
 Put the same JSON into `~/.claude/settings.json`, using an absolute path for `path`.
 
 Restart Claude Code. Changes to `plugin/` are picked up on the next session; changes to `plugin/src/claude_smart/` are picked up on the next hook invocation (hooks shell out via `uv run`, so editing the Python package takes effect immediately without a restart).
+
+Edits to the `reflexio/` submodule or `plugin/dashboard/` source are **not** picked up automatically — the SessionStart hook leaves the backend (port 8081) and the dashboard's `npm run start` against prebuilt `.next/` (port 3001) long-lived across sessions. Use the built-in restart command:
+
+```
+/claude-smart:restart          # inside Claude Code
+claude-smart restart           # from the shell
+```
+
+Runs `backend-service.sh stop` and `dashboard-service.sh stop`, then `npm run build` in `plugin/dashboard/`, then starts both services again. Flags: `--skip-backend`, `--skip-dashboard`, `--no-rebuild` for partial restarts (e.g. `--no-rebuild` when only the reflexio Python source changed).
 
 ### Step 6 — Sanity check
 

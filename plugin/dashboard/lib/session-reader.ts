@@ -9,6 +9,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
 import type {
+  CitedItem,
   SessionDetail,
   SessionSummary,
   SessionTurn,
@@ -26,11 +27,13 @@ type RawRecord = {
   role?: "User" | "Assistant" | "Assistant_tool";
   content?: string;
   ts?: number;
+  user_id?: string;
   tool_name?: string;
   tool_input?: Record<string, unknown>;
   status?: string;
   user_action?: UserActionType;
   user_action_description?: string;
+  cited_items?: CitedItem[];
   published_up_to?: number;
 };
 
@@ -96,12 +99,16 @@ function foldTurns(records: RawRecord[]): {
       role,
       content: rec.content ?? "",
       ts: rec.ts,
+      user_id: rec.user_id,
       user_action: rec.user_action,
       user_action_description: rec.user_action_description,
     };
     if (role === "Assistant" && pendingTools.length) {
       turn.tools_used = pendingTools;
       pendingTools = [];
+    }
+    if (role === "Assistant" && rec.cited_items && rec.cited_items.length) {
+      turn.cited_items = rec.cited_items;
     }
     if (
       preview === null &&

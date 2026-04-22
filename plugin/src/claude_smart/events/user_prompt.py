@@ -5,7 +5,7 @@ from __future__ import annotations
 import time
 from typing import Any
 
-from claude_smart import state
+from claude_smart import ids, state
 
 
 def handle(payload: dict[str, Any]) -> None:
@@ -19,5 +19,6 @@ def handle(payload: dict[str, Any]) -> None:
             "ts": int(time.time()),
             "role": "User",
             "content": prompt,
+            "user_id": ids.resolve_project_id(payload.get("cwd")),
         },
     )

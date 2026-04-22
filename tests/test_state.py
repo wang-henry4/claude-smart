@@ -130,6 +130,84 @@ def test_unpublished_slice_silent_assistant_placeholder_pins_tools() -> None:
     ]
 
 
+# -----------------------------------------------------------------------------
+# injected registry (cs-cite)
+# -----------------------------------------------------------------------------
+
+
+def test_append_injected_roundtrip(session_dir) -> None:
+    state.append_injected(
+        "s1",
+        [
+            {"id": "ab12", "kind": "playbook", "title": "t1", "content": "c1"},
+            {"id": "cd34", "kind": "profile", "title": "t2", "content": "c2"},
+        ],
+    )
+    registry = state.read_injected("s1")
+    assert registry["ab12"]["title"] == "t1"
+    assert registry["cd34"]["kind"] == "profile"
+
+
+def test_append_injected_empty_iter_is_noop(session_dir) -> None:
+    state.append_injected("s1", iter([]))
+    assert not state.injected_path("s1").exists()
+    assert state.read_injected("s1") == {}
+
+
+def test_read_injected_missing_file_returns_empty(session_dir) -> None:
+    assert state.read_injected("never-existed") == {}
+
+
+def test_read_injected_last_entry_wins_on_duplicate_id(session_dir) -> None:
+    """Same id injected twice → the later metadata shadows the earlier one."""
+    state.append_injected(
+        "s1", [{"id": "ab12", "kind": "playbook", "title": "old", "content": "c"}]
+    )
+    state.append_injected(
+        "s1", [{"id": "ab12", "kind": "playbook", "title": "new", "content": "c"}]
+    )
+    registry = state.read_injected("s1")
+    assert registry["ab12"]["title"] == "new"
+
+
+def test_read_injected_skips_malformed_lines(session_dir) -> None:
+    path = state.injected_path("s1")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        '{"id":"ab12","kind":"playbook","title":"ok","content":"c"}\n'
+        "not-json\n"
+        '{"id":"cd34","kind":"profile","title":"ok2","content":"c"}\n'
+    )
+    registry = state.read_injected("s1")
+    assert set(registry.keys()) == {"ab12", "cd34"}
+
+
+def test_read_injected_drops_entries_without_id(session_dir) -> None:
+    path = state.injected_path("s1")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        '{"kind":"playbook","title":"ok","content":"c"}\n'
+        '{"id":"","kind":"playbook","title":"ok","content":"c"}\n'
+        '{"id":"ab12","kind":"playbook","title":"ok","content":"c"}\n'
+    )
+    registry = state.read_injected("s1")
+    assert set(registry.keys()) == {"ab12"}
+
+
+def test_unpublished_slice_strips_cited_items(session_dir) -> None:
+    """``cited_items`` is dashboard-only metadata; reflexio must not receive it."""
+    records = [
+        {"role": "User", "content": "hi"},
+        {
+            "role": "Assistant",
+            "content": "ok",
+            "cited_items": [{"id": "ab12", "kind": "playbook", "title": "t"}],
+        },
+    ]
+    _, turns = state.unpublished_slice(records)
+    assert "cited_items" not in turns[-1]
+
+
 def _append_worker(state_dir: str, session_id: str, payload: str) -> None:
     # Child processes inherit env after fork, so CLAUDE_SMART_STATE_DIR is
     # already set. Belt-and-suspenders: reassert it.

@@ -8,7 +8,10 @@
 #                 isn't already answering. Never builds in foreground — if
 #                 .next is missing, logs and bails (Setup is responsible for
 #                 the build; rerun it or restart Claude Code to retry).
-#   stop          kill the recorded process group, if any
+#   stop          kill the recorded process group, and (if our dashboard
+#                 is still responding on the port) kill the port listener
+#                 as a fallback — covers dashboards started outside this
+#                 script or whose PGID signalling missed
 #   session-end   no-op by default; stops the dashboard if
 #                 CLAUDE_SMART_DASHBOARD_STOP_ON_END=1 (opt-in — the dashboard
 #                 is intended to be long-lived across sessions)
@@ -146,6 +149,21 @@ case "$CMD" in
     if [ -f "$PID_FILE" ]; then
       kill_group "$(cat "$PID_FILE" 2>/dev/null)"
       rm -f "$PID_FILE"
+    fi
+    # Fallback: if our dashboard is still responding on the port (e.g.,
+    # was started outside this script, or the PGID kill missed because
+    # the process wasn't the group leader) kill whoever owns the port.
+    # Gated on the marker header so we never touch a foreign listener.
+    if marker_responds && command -v lsof >/dev/null 2>&1; then
+      port_pid=$(lsof -t -i ":$PORT" -sTCP:LISTEN 2>/dev/null | head -n1)
+      if [ -n "$port_pid" ]; then
+        kill -TERM "$port_pid" 2>/dev/null || true
+        for _ in 1 2 3 4 5; do
+          kill -0 "$port_pid" 2>/dev/null || break
+          sleep 0.2
+        done
+        kill -KILL "$port_pid" 2>/dev/null || true
+      fi
     fi
     emit_ok
     ;;

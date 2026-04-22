@@ -70,6 +70,53 @@ if ! command -v claude >/dev/null 2>&1; then
   echo "[claude-smart] WARNING: 'claude' CLI not on PATH — reflexio extractors will have no LLM until it's installed" >&2
 fi
 
+# Allowlist cs-cite globally so Claude's citation Bash calls don't pop a
+# permission prompt mid-turn. Idempotent: no-ops when the entry is already
+# present. Uses Python to preserve the rest of settings.json intact.
+CLAUDE_SETTINGS="$HOME/.claude/settings.json"
+mkdir -p "$(dirname "$CLAUDE_SETTINGS")"
+if python3 - "$CLAUDE_SETTINGS" <<'PY' >&2
+import json
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+entry = "Bash(cs-cite:*)"
+data: dict = {}
+if path.is_file():
+    try:
+        data = json.loads(path.read_text() or "{}")
+    except json.JSONDecodeError:
+        print(
+            f"[claude-smart] WARNING: {path} is not valid JSON; skipping cs-cite allowlist",
+            file=sys.stderr,
+        )
+        sys.exit(2)
+def _warn_and_exit(reason: str) -> None:
+    print(
+        f"[claude-smart] WARNING: {path} {reason}; skipping cs-cite allowlist",
+        file=sys.stderr,
+    )
+    sys.exit(2)
+
+if not isinstance(data, dict):
+    _warn_and_exit("top-level is not a JSON object")
+permissions = data.setdefault("permissions", {})
+if not isinstance(permissions, dict):
+    _warn_and_exit("'permissions' is not a JSON object")
+allow = permissions.setdefault("allow", [])
+if not isinstance(allow, list):
+    _warn_and_exit("'permissions.allow' is not a JSON array")
+if entry in allow:
+    sys.exit(1)  # already present — convey via exit code so shell can skip the log
+allow.append(entry)
+path.write_text(json.dumps(data, indent=2) + "\n")
+sys.exit(0)
+PY
+then
+  echo "[claude-smart] added Bash(cs-cite:*) to $CLAUDE_SETTINGS permissions.allow" >&2
+fi
+
 # Pre-install + build the Next.js dashboard so SessionStart can boot it
 # without the multi-minute first-run cost. dashboard-service.sh will retry
 # the build lazily if either step is skipped or fails here.

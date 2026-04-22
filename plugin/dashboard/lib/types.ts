@@ -15,6 +15,12 @@ export interface ToolUsed {
   tool_data?: { input?: Record<string, unknown> };
 }
 
+export interface CitedItem {
+  id: string;
+  kind: "playbook" | "profile";
+  title: string;
+}
+
 export interface Interaction {
   interaction_id: number;
   user_id: string;
@@ -60,7 +66,9 @@ export interface SessionTurn {
   role: "User" | "Assistant";
   content: string;
   ts?: number;
+  user_id?: string;
   tools_used?: ToolUsed[];
+  cited_items?: CitedItem[];
   user_action?: UserActionType;
   user_action_description?: string;
 }

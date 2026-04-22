@@ -11,9 +11,10 @@ from __future__ import annotations
 
 import json
 import sys
+import time
 from typing import Any
 
-from claude_smart import context_format, hook, ids, query_compose
+from claude_smart import context_format, cs_cite, hook, ids, query_compose, state
 from claude_smart.reflexio_adapter import Adapter
 
 _TOP_K = 5
@@ -39,7 +40,7 @@ def handle(payload: dict[str, Any]) -> None:
         query=query,
         top_k=_TOP_K,
     )
-    markdown = context_format.render_inline(
+    markdown, registry = context_format.render_inline_with_registry(
         project_id=project_id,
         playbooks=playbooks,
         profiles=profiles,
@@ -47,6 +48,12 @@ def handle(payload: dict[str, Any]) -> None:
     if not markdown:
         hook.emit_continue()
         return
+
+    cs_cite.ensure_installed()
+    state.append_injected(
+        session_id,
+        (dict(entry, ts=int(time.time())) for entry in registry),
+    )
 
     sys.stdout.write(
         json.dumps(

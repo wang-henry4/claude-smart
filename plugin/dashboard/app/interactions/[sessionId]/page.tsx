@@ -9,14 +9,19 @@ import {
   AlertTriangle,
   ChevronRight,
   Trash2,
+  Clock,
+  FolderGit2,
+  Copy,
+  Check,
+  Sparkles,
 } from "lucide-react";
 import { PageHeader } from "@/components/common/page-header";
 import { EmptyState } from "@/components/common/empty-state";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { formatTimestamp } from "@/lib/format";
-import type { SessionDetail } from "@/lib/types";
+import { formatTimestamp, truncateId } from "@/lib/format";
+import type { CitedItem, SessionDetail } from "@/lib/types";
 
 export default function InteractionDetailPage({
   params,
@@ -175,9 +180,6 @@ export default function InteractionDetailPage({
                         </div>
                       )}
                     </div>
-                    <span className="text-[11px] text-muted-foreground font-mono">
-                      {formatTimestamp(turn.ts)}
-                    </span>
                   </header>
                   <pre className="whitespace-pre-wrap break-words text-sm font-sans leading-relaxed">
                     {turn.content}
@@ -187,6 +189,10 @@ export default function InteractionDetailPage({
                       {turn.user_action_description}
                     </p>
                   )}
+                  {turn.cited_items && turn.cited_items.length > 0 && (
+                    <CitedItemsRow items={turn.cited_items} />
+                  )}
+                  <TurnMeta ts={turn.ts} userId={turn.user_id} />
                 </article>
               );
             })}
@@ -197,5 +203,82 @@ export default function InteractionDetailPage({
         )}
       </div>
     </div>
+  );
+}
+
+function CitedItemsRow({ items }: { items: CitedItem[] }) {
+  return (
+    <div className="mt-3 flex items-start gap-2 text-[11px]">
+      <Sparkles className="h-3.5 w-3.5 mt-0.5 text-amber-500 shrink-0" />
+      <div className="flex items-center gap-1 flex-wrap">
+        <span className="text-muted-foreground">Used</span>
+        {items.map((item) => (
+          <Badge
+            key={item.id}
+            variant="outline"
+            className="h-5 gap-1 text-[10px] border-amber-500/40"
+            title={`${item.kind} • id=${item.id}`}
+          >
+            {item.title || item.id}
+          </Badge>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function TurnMeta({ ts, userId }: { ts?: number; userId?: string }) {
+  if (ts === undefined && !userId) return null;
+  return (
+    <dl className="mt-3 pt-2 border-t border-border/60 flex items-center justify-end gap-4 text-[11px]">
+      {ts !== undefined && (
+        <div className="flex items-center gap-1.5">
+          <dt className="text-muted-foreground flex items-center gap-1">
+            <Clock className="h-3 w-3" />
+          </dt>
+          <dd className="font-mono text-muted-foreground">
+            {formatTimestamp(ts)}
+          </dd>
+        </div>
+      )}
+      {userId && (
+        <div className="flex items-center gap-1.5">
+          <dt className="text-muted-foreground flex items-center gap-1">
+            <FolderGit2 className="h-3 w-3" />
+            <span>Project</span>
+          </dt>
+          <dd className="flex items-center gap-1">
+            <code className="font-mono">{truncateId(userId, 8, 4)}</code>
+            <CopyButton value={userId} />
+          </dd>
+        </div>
+      )}
+    </dl>
+  );
+}
+
+function CopyButton({ value }: { value: string }) {
+  const [copied, setCopied] = useState(false);
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1200);
+    } catch {
+      // ignore
+    }
+  };
+  return (
+    <button
+      onClick={copy}
+      className="text-muted-foreground hover:text-foreground transition-colors"
+      title="Copy"
+    >
+      {copied ? (
+        <Check className="h-3 w-3 text-emerald-500" />
+      ) : (
+        <Copy className="h-3 w-3" />
+      )}
+    </button>
   );
 }

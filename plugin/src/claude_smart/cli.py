@@ -12,11 +12,16 @@ Exposes five subcommands:
 - ``tag "<note>"``: append a ``[correction]``-prefixed turn to the active
   session buffer so reflexio's extractor sees the signal on the next
   ``learn`` pass.
+- ``restart``: stop and restart the reflexio backend + dashboard services
+  (rebuilding the dashboard bundle) so local edits under the ``reflexio``
+  submodule or ``plugin/dashboard/`` take effect without restarting Claude
+  Code.
 """
 
 from __future__ import annotations
 
 import argparse
+import os
 import shutil
 import subprocess
 import sys
@@ -33,6 +38,13 @@ _REFLEXIO_UNREACHABLE_MSG = (
     "Failed to reach reflexio. Check ~/.claude-smart/backend.log "
     "or restart Claude Code.\n"
 )
+
+_THIS_DIR = Path(__file__).resolve().parent
+_PLUGIN_ROOT = _THIS_DIR.parents[1]  # plugin/src/claude_smart/ -> plugin/
+_SCRIPTS_DIR = _PLUGIN_ROOT / "scripts"
+_DASHBOARD_DIR = _PLUGIN_ROOT / "dashboard"
+_BACKEND_SCRIPT = _SCRIPTS_DIR / "backend-service.sh"
+_DASHBOARD_SCRIPT = _SCRIPTS_DIR / "dashboard-service.sh"
 
 
 def _latest_session_id() -> str | None:
@@ -149,8 +161,8 @@ def cmd_show(args: argparse.Namespace) -> int:
     """
     project_id = args.project or ids.resolve_project_id()
     adapter = Adapter()
-    playbooks = adapter.fetch_project_playbooks(project_id)
-    profiles: list = adapter.fetch_project_profiles(project_id)
+    playbooks = adapter.fetch_project_playbooks(project_id, top_k=3)
+    profiles: list = adapter.fetch_project_profiles(project_id, top_k=3)
     md = context_format.render(
         project_id=project_id, playbooks=playbooks, profiles=profiles
     )
@@ -198,10 +210,139 @@ def cmd_tag(args: argparse.Namespace) -> int:
             "ts": int(time.time()),
             "role": "User",
             "content": f"[correction] {note}",
+            "user_id": ids.resolve_project_id(os.getcwd()),
         },
     )
     sys.stdout.write(f"Tagged correction on session `{session_id}`.\n")
     return 0
+
+
+def _run_service(script: Path, subcmd: str) -> int:
+    """Invoke a service script (``backend-service.sh`` / ``dashboard-service.sh``).
+
+    Args:
+        script (Path): Absolute path to the service shell script.
+        subcmd (str): Subcommand to pass (``start``, ``stop``, ``status``).
+
+    Returns:
+        int: The script's exit code, or 1 if the script is missing.
+    """
+    if not script.exists():
+        sys.stderr.write(f"error: {script} not found\n")
+        return 1
+    try:
+        subprocess.run([str(script), subcmd], check=True)
+        return 0
+    except subprocess.CalledProcessError as exc:
+        return exc.returncode or 1
+
+
+def _service_status(script: Path, wait_ready_s: float = 3.0) -> str:
+    """Return the one-line status string for a service script.
+
+    Service scripts spawn their targets detached and return immediately, so
+    a status probe fired right after ``start`` can race the child's cold
+    boot (e.g. Next.js takes ~150ms to bind). Poll briefly until the script
+    reports something other than ``not running`` or the deadline expires.
+
+    Args:
+        script (Path): Path to the service script.
+        wait_ready_s (float): Max seconds to wait for a ready status before
+            returning the last observed value.
+
+    Returns:
+        str: One-line status string (e.g. ``"running on http://..."`` or
+        ``"not running"``).
+    """
+    if not script.exists():
+        return "script missing"
+    deadline = time.monotonic() + wait_ready_s
+    while True:
+        result = subprocess.run(
+            [str(script), "status"], capture_output=True, text=True, check=False
+        )
+        status = result.stdout.strip() or "unknown"
+        if status != "not running" or time.monotonic() >= deadline:
+            return status
+        time.sleep(0.2)
+
+
+def cmd_restart(args: argparse.Namespace) -> int:
+    """Restart the reflexio backend and claude-smart dashboard services.
+
+    Stops both long-lived services, optionally rebuilds the dashboard's
+    Next.js bundle so source edits under ``plugin/dashboard/`` take effect,
+    then starts them again. Useful during local development when iterating
+    on the ``reflexio`` submodule or the dashboard.
+
+    Args:
+        args (argparse.Namespace): Parsed CLI args. Honors ``args.skip_backend``,
+            ``args.skip_dashboard``, and ``args.no_rebuild``.
+
+    Returns:
+        int: 0 on success, non-zero if the dashboard rebuild fails or
+            either service's ``start`` subcommand exits non-zero.
+    """
+    do_backend = not args.skip_backend
+    do_dashboard = not args.skip_dashboard
+
+    if not (do_backend or do_dashboard):
+        sys.stdout.write("Nothing to restart (both services skipped).\n")
+        return 0
+
+    if do_backend:
+        sys.stdout.write("Stopping reflexio backend…\n")
+        _run_service(_BACKEND_SCRIPT, "stop")
+    if do_dashboard:
+        sys.stdout.write("Stopping dashboard…\n")
+        _run_service(_DASHBOARD_SCRIPT, "stop")
+
+    if do_dashboard and not args.no_rebuild:
+        if not _DASHBOARD_DIR.is_dir():
+            sys.stderr.write(
+                f"warning: dashboard dir {_DASHBOARD_DIR} missing; skipping rebuild\n"
+            )
+        elif not shutil.which("npm"):
+            sys.stderr.write("warning: npm not on PATH; serving previous build\n")
+        else:
+            sys.stdout.write(
+                "Rebuilding dashboard (npm run build, may take a minute)…\n"
+            )
+            try:
+                subprocess.run(["npm", "run", "build"], cwd=_DASHBOARD_DIR, check=True)
+            except subprocess.CalledProcessError as exc:
+                sys.stderr.write(
+                    f"error: dashboard build failed (exit {exc.returncode}); "
+                    "not starting dashboard.\n"
+                )
+                if do_backend:
+                    sys.stdout.write("Starting reflexio backend…\n")
+                    _run_service(_BACKEND_SCRIPT, "start")
+                    sys.stdout.write(
+                        f"reflexio backend: {_service_status(_BACKEND_SCRIPT)}\n"
+                    )
+                return exc.returncode or 1
+
+    start_rc = 0
+    if do_backend:
+        sys.stdout.write("Starting reflexio backend…\n")
+        rc = _run_service(_BACKEND_SCRIPT, "start")
+        if rc != 0:
+            sys.stderr.write(f"error: reflexio backend failed to start (exit {rc})\n")
+            start_rc = rc
+    if do_dashboard:
+        sys.stdout.write("Starting dashboard…\n")
+        rc = _run_service(_DASHBOARD_SCRIPT, "start")
+        if rc != 0:
+            sys.stderr.write(f"error: dashboard failed to start (exit {rc})\n")
+            start_rc = start_rc or rc
+
+    sys.stdout.write("\n")
+    if do_backend:
+        sys.stdout.write(f"reflexio backend: {_service_status(_BACKEND_SCRIPT)}\n")
+    if do_dashboard:
+        sys.stdout.write(f"dashboard: {_service_status(_DASHBOARD_SCRIPT)}\n")
+    return start_rc
 
 
 def cmd_clear_all(args: argparse.Namespace) -> int:
@@ -295,6 +436,27 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Confirm the destructive clear without prompting",
     )
     ca.set_defaults(func=cmd_clear_all)
+
+    rs = sub.add_parser(
+        "restart",
+        help="Restart the reflexio backend and dashboard to pick up changes",
+    )
+    rs.add_argument(
+        "--skip-backend",
+        action="store_true",
+        help="Do not stop/start the reflexio backend",
+    )
+    rs.add_argument(
+        "--skip-dashboard",
+        action="store_true",
+        help="Do not stop/start the dashboard",
+    )
+    rs.add_argument(
+        "--no-rebuild",
+        action="store_true",
+        help="Skip the `npm run build` step before restarting the dashboard",
+    )
+    rs.set_defaults(func=cmd_restart)
     return parser
 
 

@@ -10,7 +10,7 @@ from typing import Any
 import pytest
 
 from claude_smart import state
-from claude_smart.events import post_tool, session_start, stop
+from claude_smart.events import post_tool, session_start, stop, user_prompt
 
 
 # -----------------------------------------------------------------------------
@@ -140,11 +140,8 @@ def test_stop_appends_assistant_text_from_transcript(
     )
     stop.handle({"session_id": "s1", "transcript_path": str(transcript)})
     records = state.read_all("s1")
-    assert records[-1] == {
-        "role": "Assistant",
-        "content": "hello there",
-        "ts": records[-1]["ts"],
-    }
+    assert records[-1]["role"] == "Assistant"
+    assert records[-1]["content"] == "hello there"
 
 
 def test_stop_concatenates_text_across_multi_entry_assistant_turn(
@@ -260,9 +257,345 @@ def test_stop_appends_empty_assistant_record_when_turn_was_tools_only(
     assert any(r.get("role") == "Assistant" and r.get("content") == "" for r in records)
 
 
+def test_stop_retries_read_when_transcript_not_yet_flushed(
+    session_dir, tmp_path, monkeypatch
+) -> None:
+    """Race: Stop fires before Claude Code's final text write is readable.
+
+    Regression guard for the documented race in ``_read_last_assistant_text``
+    — first scan sees a tool-only tail because the final ``type: text`` entry
+    hasn't hit the page cache yet. The retry must pick up the text instead
+    of persisting an empty Assistant record.
+    """
+    transcript = _write_transcript(
+        tmp_path,
+        [
+            {"type": "user", "message": {"content": "hi"}},
+            {
+                "type": "assistant",
+                "message": {"content": [{"type": "tool_use", "name": "Bash"}]},
+            },
+            {
+                "type": "user",
+                "message": {"content": [{"type": "tool_result", "content": "ok"}]},
+            },
+        ],
+    )
+
+    sleep_calls: list[float] = []
+
+    def fake_sleep(delay: float) -> None:
+        sleep_calls.append(delay)
+        if len(sleep_calls) == 1:
+            with transcript.open("a") as fh:
+                fh.write(
+                    json.dumps(
+                        {
+                            "type": "assistant",
+                            "message": {
+                                "content": [{"type": "text", "text": "late answer"}]
+                            },
+                        }
+                    )
+                    + "\n"
+                )
+
+    monkeypatch.setattr("claude_smart.events.stop.time.sleep", fake_sleep)
+    monkeypatch.setattr(
+        "claude_smart.publish.publish_unpublished",
+        lambda **_: ("nothing", 0),
+    )
+    stop.handle({"session_id": "s1", "transcript_path": str(transcript)})
+    records = state.read_all("s1")
+    assert records[-1]["content"] == "late answer"
+    assert len(sleep_calls) == 1
+
+
+def test_stop_retry_exhausts_budget_and_returns_empty(
+    session_dir, tmp_path, monkeypatch
+) -> None:
+    """All retries miss the flush — Assistant record persists with empty content.
+
+    Confirms the retry loop is bounded and falls through to the empty-record
+    path (Option A) instead of spinning or raising.
+    """
+    transcript = _write_transcript(
+        tmp_path,
+        [
+            {"type": "user", "message": {"content": "hi"}},
+            {
+                "type": "assistant",
+                "message": {"content": [{"type": "tool_use", "name": "Bash"}]},
+            },
+        ],
+    )
+    sleep_calls: list[float] = []
+    monkeypatch.setattr(
+        "claude_smart.events.stop.time.sleep",
+        lambda d: sleep_calls.append(d),
+    )
+    monkeypatch.setattr(
+        "claude_smart.publish.publish_unpublished",
+        lambda **_: ("nothing", 0),
+    )
+    stop.handle({"session_id": "s1", "transcript_path": str(transcript)})
+    records = state.read_all("s1")
+    assert records[-1]["role"] == "Assistant"
+    assert records[-1]["content"] == ""
+    # All configured delays were consumed — no early exit on non-empty.
+    assert len(sleep_calls) == len(stop._TRANSCRIPT_RETRY_DELAYS_S)
+
+
+def test_stop_stamps_user_id_from_payload_cwd(
+    session_dir, tmp_path, monkeypatch
+) -> None:
+    """Assistant record carries user_id resolved from the hook payload's cwd."""
+    transcript = _write_transcript(
+        tmp_path,
+        [
+            {"type": "user", "message": {"content": "hi"}},
+            {
+                "type": "assistant",
+                "message": {"content": [{"type": "text", "text": "ok"}]},
+            },
+        ],
+    )
+    monkeypatch.setattr(
+        "claude_smart.events.stop.ids.resolve_project_id",
+        lambda cwd=None: f"proj::{cwd}",
+    )
+    monkeypatch.setattr(
+        "claude_smart.publish.publish_unpublished",
+        lambda **_: ("nothing", 0),
+    )
+    stop.handle(
+        {
+            "session_id": "s1",
+            "transcript_path": str(transcript),
+            "cwd": "/some/repo",
+        }
+    )
+    records = state.read_all("s1")
+    assert records[-1]["user_id"] == "proj::/some/repo"
+
+
+def test_user_prompt_stamps_user_id_from_payload_cwd(session_dir, monkeypatch) -> None:
+    """User record carries user_id resolved from the hook payload's cwd."""
+    monkeypatch.setattr(
+        "claude_smart.events.user_prompt.ids.resolve_project_id",
+        lambda cwd=None: f"proj::{cwd}",
+    )
+    user_prompt.handle({"session_id": "s1", "prompt": "hello", "cwd": "/some/repo"})
+    records = state.read_all("s1")
+    assert records[-1]["role"] == "User"
+    assert records[-1]["content"] == "hello"
+    assert records[-1]["user_id"] == "proj::/some/repo"
+
+
 def test_stop_without_session_is_noop(session_dir) -> None:
     stop.handle({})
     assert state.read_all("s1") == []
+
+
+# -----------------------------------------------------------------------------
+# stop — cs-cite citation extraction
+# -----------------------------------------------------------------------------
+
+
+def _transcript_with_cs_cite_call(tmp_path, cs_cite_command: str):
+    """Build a transcript whose current turn ends with a cs-cite Bash call."""
+    return _write_transcript(
+        tmp_path,
+        [
+            {"type": "user", "message": {"content": "do the thing"}},
+            {
+                "type": "assistant",
+                "message": {"content": [{"type": "text", "text": "On it."}]},
+            },
+            {
+                "type": "assistant",
+                "message": {
+                    "content": [
+                        {
+                            "type": "tool_use",
+                            "name": "Bash",
+                            "input": {"command": cs_cite_command},
+                        }
+                    ]
+                },
+            },
+        ],
+    )
+
+
+def _prime_injected_registry(session_id: str) -> None:
+    state.append_injected(
+        session_id,
+        [
+            {
+                "id": "ab12",
+                "kind": "playbook",
+                "title": "use pathlib",
+                "content": "use pathlib",
+                "ts": 0,
+            },
+            {
+                "id": "cd34",
+                "kind": "profile",
+                "title": "prefers anyio",
+                "content": "prefers anyio",
+                "ts": 0,
+            },
+        ],
+    )
+
+
+def test_stop_records_cs_cite_ids_as_cited_items(
+    session_dir, tmp_path, monkeypatch
+) -> None:
+    """A single cs-cite call resolves ids against the session registry."""
+    _prime_injected_registry("s1")
+    transcript = _transcript_with_cs_cite_call(tmp_path, "cs-cite ab12,cd34")
+    monkeypatch.setattr(
+        "claude_smart.publish.publish_unpublished", lambda **_: ("nothing", 0)
+    )
+    stop.handle({"session_id": "s1", "transcript_path": str(transcript)})
+    records = state.read_all("s1")
+    assert records[-1]["role"] == "Assistant"
+    cited = records[-1].get("cited_items")
+    assert cited == [
+        {"id": "ab12", "kind": "playbook", "title": "use pathlib"},
+        {"id": "cd34", "kind": "profile", "title": "prefers anyio"},
+    ]
+
+
+def test_stop_omits_cited_items_when_no_cs_cite_call(
+    session_dir, tmp_path, monkeypatch
+) -> None:
+    """Non-citing turns leave no cited_items key on the Assistant record."""
+    _prime_injected_registry("s1")
+    transcript = _write_transcript(
+        tmp_path,
+        [
+            {"type": "user", "message": {"content": "hi"}},
+            {
+                "type": "assistant",
+                "message": {"content": [{"type": "text", "text": "ok"}]},
+            },
+        ],
+    )
+    monkeypatch.setattr(
+        "claude_smart.publish.publish_unpublished", lambda **_: ("nothing", 0)
+    )
+    stop.handle({"session_id": "s1", "transcript_path": str(transcript)})
+    records = state.read_all("s1")
+    assert "cited_items" not in records[-1]
+
+
+def test_stop_drops_unknown_cs_cite_ids(session_dir, tmp_path, monkeypatch) -> None:
+    """Ids not present in the session registry are silently dropped."""
+    _prime_injected_registry("s1")
+    transcript = _transcript_with_cs_cite_call(tmp_path, "cs-cite ab12,ffff")
+    monkeypatch.setattr(
+        "claude_smart.publish.publish_unpublished", lambda **_: ("nothing", 0)
+    )
+    stop.handle({"session_id": "s1", "transcript_path": str(transcript)})
+    records = state.read_all("s1")
+    cited = records[-1].get("cited_items")
+    assert cited == [
+        {"id": "ab12", "kind": "playbook", "title": "use pathlib"},
+    ]
+
+
+def test_stop_merges_multiple_cs_cite_calls_dedup(
+    session_dir, tmp_path, monkeypatch
+) -> None:
+    """Multiple cs-cite calls within one turn merge; duplicate ids collapse."""
+    _prime_injected_registry("s1")
+    transcript = _write_transcript(
+        tmp_path,
+        [
+            {"type": "user", "message": {"content": "hi"}},
+            {
+                "type": "assistant",
+                "message": {
+                    "content": [
+                        {
+                            "type": "tool_use",
+                            "name": "Bash",
+                            "input": {"command": "cs-cite ab12"},
+                        }
+                    ]
+                },
+            },
+            {
+                "type": "assistant",
+                "message": {
+                    "content": [
+                        {
+                            "type": "tool_use",
+                            "name": "Bash",
+                            "input": {"command": "cs-cite ab12,cd34"},
+                        }
+                    ]
+                },
+            },
+        ],
+    )
+    monkeypatch.setattr(
+        "claude_smart.publish.publish_unpublished", lambda **_: ("nothing", 0)
+    )
+    stop.handle({"session_id": "s1", "transcript_path": str(transcript)})
+    records = state.read_all("s1")
+    cited = records[-1].get("cited_items")
+    assert cited == [
+        {"id": "ab12", "kind": "playbook", "title": "use pathlib"},
+        {"id": "cd34", "kind": "profile", "title": "prefers anyio"},
+    ]
+
+
+def test_stop_rejects_chained_cs_cite_commands(
+    session_dir, tmp_path, monkeypatch
+) -> None:
+    """A Bash call that chains cs-cite with other commands is not parsed as a citation.
+
+    Guards against false positives when Claude wraps the citation in a
+    larger command (pipes, ``&&``, heredoc). The parser only accepts a
+    bare ``cs-cite <ids>`` invocation.
+    """
+    _prime_injected_registry("s1")
+    transcript = _transcript_with_cs_cite_call(tmp_path, "cs-cite ab12 && echo done")
+    monkeypatch.setattr(
+        "claude_smart.publish.publish_unpublished", lambda **_: ("nothing", 0)
+    )
+    stop.handle({"session_id": "s1", "transcript_path": str(transcript)})
+    records = state.read_all("s1")
+    assert "cited_items" not in records[-1]
+
+
+def test_stop_handles_missing_transcript_file(session_dir, monkeypatch) -> None:
+    """``transcript_path`` points at a nonexistent file → no crash, empty record."""
+    monkeypatch.setattr(
+        "claude_smart.publish.publish_unpublished", lambda **_: ("nothing", 0)
+    )
+    stop.handle({"session_id": "s1", "transcript_path": "/does/not/exist.jsonl"})
+    records = state.read_all("s1")
+    assert records[-1]["role"] == "Assistant"
+    assert records[-1]["content"] == ""
+    assert "cited_items" not in records[-1]
+
+
+def test_stop_citation_without_prior_registry_drops_all_ids(
+    session_dir, tmp_path, monkeypatch
+) -> None:
+    """Citation with no ``.injected.jsonl`` (e.g. resumed session) → all ids drop."""
+    transcript = _transcript_with_cs_cite_call(tmp_path, "cs-cite ab12")
+    monkeypatch.setattr(
+        "claude_smart.publish.publish_unpublished", lambda **_: ("nothing", 0)
+    )
+    stop.handle({"session_id": "s1", "transcript_path": str(transcript)})
+    records = state.read_all("s1")
+    assert "cited_items" not in records[-1]
 
 
 # -----------------------------------------------------------------------------
@@ -391,7 +724,6 @@ def test_session_start_fetches_both_on_every_source(session_dir, monkeypatch) ->
     assert len(calls) == 4
     for kw in calls:
         assert kw["project_id"] == "demo"
-        assert kw["session_id"] == "s1"
 
 
 # -----------------------------------------------------------------------------
@@ -464,9 +796,8 @@ def test_pre_tool_injects_context_when_hits_present(session_dir, monkeypatch) ->
     markdown = payload["hookSpecificOutput"]["additionalContext"]
     assert "run uv sync after edits" in markdown
     assert "prefers anyio over asyncio" in markdown
-    # Composed query must reach the adapter with both scoping ids.
+    # Composed query must reach the adapter scoped to the project.
     assert calls[0]["project_id"] == "demo"
-    assert calls[0]["session_id"] == "s1"
     assert "pyproject.toml" in calls[0]["query"]
 
 

@@ -52,7 +52,10 @@ def test_publish_returns_true_on_success() -> None:
         force_extraction=True,
     )
     assert ok is True
-    assert client.published_kwargs["user_id"] == "s1"
+    # After the project-scoped-profiles refactor (commit 88cb150), reflexio's
+    # ``user_id`` is the project slug and ``session_id`` is sent separately.
+    assert client.published_kwargs["user_id"] == "p1"
+    assert client.published_kwargs["session_id"] == "s1"
     assert client.published_kwargs["agent_version"] == "p1"
     assert client.published_kwargs["force_extraction"] is True
 
@@ -82,13 +85,13 @@ def test_fetch_playbooks_reads_user_playbooks_field() -> None:
 def test_fetch_profiles_reads_user_profiles_field() -> None:
     resp = SimpleNamespace(user_profiles=[{"content": "pref"}])
     a = _adapter_with(_FakeClient(profile_resp=resp))
-    assert a.fetch_session_profiles("s1") == [{"content": "pref"}]
+    assert a.fetch_project_profiles("p1") == [{"content": "pref"}]
 
 
 def test_fetch_helpers_return_empty_on_unknown_shape() -> None:
     a = _adapter_with(_FakeClient(playbook_resp=object(), profile_resp=object()))
     assert a.fetch_project_playbooks("p1") == []
-    assert a.fetch_session_profiles("s1") == []
+    assert a.fetch_project_profiles("p1") == []
 
 
 def test_publish_returns_false_when_client_unavailable(monkeypatch) -> None:
@@ -142,13 +145,14 @@ def test_search_playbooks_passes_query_and_hybrid_mode() -> None:
     assert client.playbook_kwargs["status_filter"] == [None]
 
 
-def test_search_profiles_scopes_to_session_id() -> None:
+def test_search_profiles_scopes_to_project_id() -> None:
+    """After commit 88cb150 profiles are project-scoped: user_id = project slug."""
     client = _RecordingClient(
         profile_resp=SimpleNamespace(user_profiles=[{"content": "pref"}])
     )
     a = _adapter_with(client)
-    assert a.search_profiles(session_id="s1", query="q") == [{"content": "pref"}]
-    assert client.profile_kwargs["user_id"] == "s1"
+    assert a.search_profiles(project_id="proj", query="q") == [{"content": "pref"}]
+    assert client.profile_kwargs["user_id"] == "proj"
     assert client.profile_kwargs["query"] == "q"
 
 
@@ -158,9 +162,7 @@ def test_search_both_returns_both_lists() -> None:
         profile_resp=SimpleNamespace(user_profiles=[{"content": "p"}]),
     )
     a = _adapter_with(client)
-    playbooks, profiles = a.search_both(
-        project_id="proj", session_id="s1", query="q", top_k=2
-    )
+    playbooks, profiles = a.search_both(project_id="proj", query="q", top_k=2)
     assert playbooks == [{"content": "r"}]
     assert profiles == [{"content": "p"}]
     # Both legs see the same query.
@@ -182,7 +184,7 @@ def test_search_both_runs_legs_in_parallel() -> None:
 
     a = _adapter_with(SlowClient())
     t0 = time.perf_counter()
-    a.search_both(project_id="p", session_id="s", query="q")
+    a.search_both(project_id="p", query="q")
     elapsed = time.perf_counter() - t0
     assert elapsed < 0.35, f"legs did not run in parallel (elapsed={elapsed:.3f}s)"
 
@@ -196,7 +198,7 @@ def test_search_both_absorbs_one_leg_failure() -> None:
             return SimpleNamespace(user_profiles=[{"content": "p"}])
 
     a = _adapter_with(HalfBroken())
-    playbooks, profiles = a.search_both(project_id="p", session_id="s", query="q")
+    playbooks, profiles = a.search_both(project_id="p", query="q")
     assert playbooks == []
     assert profiles == [{"content": "p"}]
 
@@ -207,7 +209,7 @@ def test_fetch_both_parallelizes_broad_fetch() -> None:
         profile_resp=SimpleNamespace(user_profiles=[{"content": "p"}]),
     )
     a = _adapter_with(client)
-    playbooks, profiles = a.fetch_both(project_id="proj", session_id="s1")
+    playbooks, profiles = a.fetch_both(project_id="proj")
     assert playbooks == [{"content": "r"}]
     assert profiles == [{"content": "p"}]
     # Broad fetch path does NOT set `query` — confirm the empty-query recency fallback is used.

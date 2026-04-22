@@ -70,6 +70,61 @@ def session_path(session_id: str) -> Path:
     return state_dir() / f"{session_id}.jsonl"
 
 
+def injected_path(session_id: str) -> Path:
+    """Return the JSONL path for the per-session cs-cite registry."""
+    return state_dir() / f"{session_id}.injected.jsonl"
+
+
+def append_injected(session_id: str, entries: Iterable[dict[str, Any]]) -> None:
+    """Append citation-registry entries to the per-session injected-items file.
+
+    Each entry maps a short ``id`` (4-hex-char) back to the playbook or
+    profile it came from so the Stop hook can resolve ids cited by
+    Claude via ``cs-cite`` into human-readable titles for the dashboard.
+    Silently no-ops when ``entries`` is empty.
+    """
+    records = list(entries)
+    if not records:
+        return
+    path = injected_path(session_id)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("a", encoding="utf-8") as fh:
+        if fcntl is not None:
+            try:
+                fcntl.flock(fh.fileno(), fcntl.LOCK_EX)
+            except OSError as exc:
+                _LOGGER.debug("flock failed on %s: %s", path, exc)
+        for rec in records:
+            fh.write(json.dumps(rec, ensure_ascii=False) + "\n")
+
+
+def read_injected(session_id: str) -> dict[str, dict[str, Any]]:
+    """Return the per-session citation registry keyed by id.
+
+    Later entries win when the same id was injected multiple times
+    (identical content produces the same hash-derived id, so the extra
+    record only refreshes metadata).
+    """
+    path = injected_path(session_id)
+    if not path.exists():
+        return {}
+    registry: dict[str, dict[str, Any]] = {}
+    with path.open("r", encoding="utf-8") as fh:
+        for line in fh:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                entry = json.loads(line)
+            except json.JSONDecodeError as exc:
+                _LOGGER.warning("Skipping malformed injected line in %s: %s", path, exc)
+                continue
+            item_id = entry.get("id")
+            if isinstance(item_id, str) and item_id:
+                registry[item_id] = entry
+    return registry
+
+
 def append(session_id: str, record: dict[str, Any]) -> None:
     """Append one JSON record to the session buffer. Creates the dir if needed.
 
@@ -148,7 +203,11 @@ def unpublished_slice(
             pending_tools.append(tool_entry)
             continue
         if role in {"User", "Assistant"}:
-            turn = {k: v for k, v in rec.items() if k not in {"role", "ts"}}
+            # ``cited_items`` is local-only metadata for the dashboard's
+            # "used" badge; reflexio's InteractionData has no slot for it.
+            turn = {
+                k: v for k, v in rec.items() if k not in {"role", "ts", "cited_items"}
+            }
             turn["role"] = role
             if role == "Assistant" and pending_tools:
                 turn["tools_used"] = pending_tools

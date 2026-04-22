@@ -1,0 +1,46 @@
+#!/usr/bin/env python3
+"""cs-cite — claude-smart citation tool.
+
+Claude invokes this via Bash at the end of a reply when an injected
+playbook or profile materially shaped the response. The script's only
+job is to print a tasteful TUI confirmation line. The citation IDs
+themselves are read off the Bash ``tool_use`` block by claude-smart's
+Stop hook when it scans the session transcript — no session_id, no
+sidecar file, no state.
+
+Usage:
+    cs-cite <comma-separated-ids>
+
+Example:
+    cs-cite ab12,cd34  ->  ✨ used 2 claude-smart learnings
+"""
+
+from __future__ import annotations
+
+import re
+import sys
+
+_IDS_RE = re.compile(r"^[a-f0-9]{4}(?:,[a-f0-9]{4})*$")
+
+
+def main() -> int:
+    argv = sys.argv[1:]
+    if len(argv) != 1:
+        sys.stderr.write(
+            "cs-cite: expected exactly one comma-separated ids argument\n"
+        )
+        return 1
+    if not _IDS_RE.match(argv[0]):
+        sys.stderr.write(
+            "cs-cite: ids must be comma-separated 4-hex-char tokens "
+            "(e.g. ab12,cd34)\n"
+        )
+        return 1
+    n = argv[0].count(",") + 1
+    suffix = "" if n == 1 else "s"
+    sys.stdout.write(f"✨ used {n} claude-smart learning{suffix}\n")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
