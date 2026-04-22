@@ -32,7 +32,7 @@
   <a href="#slash-commands">Slash Commands</a> •
   <a href="#dashboard">Dashboard</a> •
   <a href="#configuration">Configuration</a> •
-  <a href="#troubleshooting">Troubleshooting</a> •
+  <a href="TROUBLESHOOTING.md">Troubleshooting</a> •
   <a href="#license">License</a>
 </p>
 
@@ -165,36 +165,7 @@ Advanced users can tune claude-smart via environment variables — see [DEVELOPE
 | `~/.claude-smart/sessions/{session_id}.jsonl` | Per-session buffer. User turns, assistant turns, tool invocations, `{"published_up_to": N}` watermarks. Safe to inspect and safe to delete — everything past the latest watermark has already been written to reflexio's DB. |
 | `~/.cache/chroma/onnx_models/all-MiniLM-L6-v2/` | Cached ONNX weights (~86 MB, downloaded once). Delete to force a re-download. |
 
-### Embeddings
-
-claude-smart uses an in-process ONNX embedder (Chroma's `all-MiniLM-L6-v2`, 384-dim, zero-padded to reflexio's 512-dim schema). The model weights are downloaded on first use (~80 MB, cached under `~/.cache/chroma/onnx_models/`) — after that, no network calls for embedding. Runtime cost is a few milliseconds per short document on CPU.
-
-If you still want to use a cloud embedding provider (OpenAI, Gemini, etc.), omit `CLAUDE_SMART_USE_LOCAL_EMBEDDING` and set the corresponding API key in `~/.reflexio/.env` — reflexio will fall back to its standard provider-priority chain.
-
----
-
-## Troubleshooting
-
-**SessionStart injects nothing after a correction.**
-Extraction is async by default. Run `/learn` to force it, wait ~20–30s, then run `/show` — no new session needed. `/show` shows whether the rule was actually extracted.
-
-**Reflexio refuses to boot with "no embedding-capable provider".**
-Check that `CLAUDE_SMART_USE_LOCAL_EMBEDDING=1` is in `~/.reflexio/.env` *and* that `chromadb` is installed in the venv (`uv run --project plugin python -c "import chromadb"` should print nothing). If you'd rather use a cloud embedder instead, drop the env flag and set `OPENAI_API_KEY` or `GEMINI_API_KEY` in the same file.
-
-**`claude-smart` doesn't see my interactions.**
-Check `~/.claude-smart/sessions/`. If your current session's JSONL has no `User`/`Assistant` rows, the plugin isn't receiving hook events — verify `.claude/settings.local.json` has the right path and that `enabledPlugins` is `true`.
-
-**Hooks appear to time out.**
-Each hook is capped at 15–60s. If you see long pauses, check `uv` is on PATH (hooks shell out to `uv run`). Set `CLAUDE_SMART_CLI_TIMEOUT=180` to give the LLM provider more headroom.
-
-**A different LLM is being used.**
-Reflexio's provider priority is `claude-code > local > anthropic > gemini > ... > openai`. If you have `CLAUDE_SMART_USE_LOCAL_CLI=1` *and* an Anthropic key set, claude-code still wins for generation; `local` sits above openai/gemini for embeddings. Check the startup log line `Primary provider for generation: <name>` and `Embedding provider: <name>` to confirm.
-
-**I want to wipe everything and start over.**
-```bash
-rm -rf ~/.claude-smart/sessions/
-rm -rf ~/.reflexio/data/           # reflexio SQLite store
-```
+For troubleshooting, see [TROUBLESHOOTING.md](./TROUBLESHOOTING.md).
 
 ---
 

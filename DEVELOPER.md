@@ -35,6 +35,12 @@ Tunables read by the plugin at runtime. Most users don't need to touch these —
 | `CLAUDE_SMART_BACKEND_STOP_ON_END` | `0` | Set to `1` to tear down the backend at `SessionEnd` instead of leaving it long-lived. |
 | `REFLEXIO_URL` | `http://localhost:8081/` | Point the plugin at a non-local reflexio backend. |
 
+## Embeddings
+
+claude-smart uses an in-process ONNX embedder (Chroma's `all-MiniLM-L6-v2`, 384-dim, zero-padded to reflexio's 512-dim schema). The model weights are downloaded on first use (~80 MB, cached under `~/.cache/chroma/onnx_models/`) — after that, no network calls for embedding. Runtime cost is a few milliseconds per short document on CPU.
+
+If you still want to use a cloud embedding provider (OpenAI, Gemini, etc.), omit `CLAUDE_SMART_USE_LOCAL_EMBEDDING` and set the corresponding API key in `~/.reflexio/.env` — reflexio will fall back to its standard provider-priority chain.
+
 ## Scope: profile vs. playbook
 
 Both profiles and playbooks are project-scoped (since the 88cb150 refactor), identified by the git-toplevel basename of the working directory. What differs is the extractor channel and the shape of the record:
