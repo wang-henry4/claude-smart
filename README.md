@@ -43,7 +43,7 @@
 <p align="center">
   <b>Head-to-head vs <code>claude-mem</code>.</b> Evaluated across 12 scripted scenarios.
   <br>
-  <b>~2.7× higher overall quality </b> &nbsp;·&nbsp; <b>User correction:</b> right rule learnt every time vs none  &nbsp;·&nbsp; See <a href="benchmarks/memory_comparison/EXPERIMENT.md">EXPERIMENT.md</a> for details.
+  <b>~2.7× higher overall quality </b> &nbsp;·&nbsp; Right user correction learnt every time vs none  &nbsp;·&nbsp; See <a href="benchmarks/memory_comparison/EXPERIMENT.md">EXPERIMENT.md</a> for details.
 </p>
 
 ---
