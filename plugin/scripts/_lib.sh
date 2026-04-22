@@ -11,3 +11,12 @@ claude_smart_source_login_path() {
     fi
   fi
 }
+
+# Prepend the astral.sh installer's default bin directories to PATH so a
+# freshly-installed `uv` is reachable before the user re-sources their
+# shell rc. Prepend (not append) so the just-installed binary wins over
+# any stale copy earlier in PATH. Literals only — no subshell, so safe
+# under `set -u`.
+claude_smart_prepend_astral_bins() {
+  export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"
+}

@@ -37,15 +37,30 @@ _SOURCE_SCRIPT = _PLUGIN_ROOT / "bin" / "cs-cite"
 _INSTALL_DIR = Path.home() / ".claude-smart" / "bin"
 INSTALL_PATH = _INSTALL_DIR / "cs-cite"
 
+# Match a bare `cs-cite <ids>` invocation. Ids are 4-hex-char tokens,
+# optionally `cs:`-prefixed (since playbook items render as `[cs:ab12]`
+# and the model often copies the tag verbatim). The `(?i:cs:)` inline
+# flag makes only the prefix case-insensitive so `CS:AB12` is accepted
+# — matching the `re.IGNORECASE` used by the standalone `cs-cite`
+# script. Tokens may be comma- and/or whitespace-separated. Chained
+# commands (&&, |, ;) and extra trailing tokens remain rejected by the
+# anchored `\s*$` terminator so accidental mentions don't register as
+# citations.
+_ID_TOKEN = r"(?i:cs:)?[A-Fa-f0-9]{4}"
+_ID_SEP = r"[,\s]+"
 CITATION_CMD_RE = re.compile(
-    r"^\s*(?:[^\s]*/)?cs-cite\s+([a-f0-9]{4}(?:,[a-f0-9]{4})*)\s*$"
+    rf"^\s*(?:[^\s]*/)?cs-cite\s+({_ID_TOKEN}(?:{_ID_SEP}{_ID_TOKEN})*)\s*$"
 )
+_CLEAN_ID_RE = re.compile(r"^(?i:cs:)?([A-Fa-f0-9]{4})$")
+_SPLIT_RE = re.compile(_ID_SEP)
 
 CITATION_INSTRUCTION = (
-    "_If any item above materially shaped this response, cite the used "
-    "items by running `cs-cite ID1,ID2` via the Bash tool at the end of "
-    "your reply (ids only, no prose; one Bash call, command is exactly "
-    "`cs-cite <ids>`). Omit entirely if none applied._"
+    "_If any item above materially shaped this response, end your reply "
+    "with `cs-cite ab12,cd34` via the Bash tool — pass the 4-hex ids "
+    "from the `[cs:xxxx]` tags (e.g. for `[cs:ab12]` and `[cs:cd34]` run "
+    "`cs-cite ab12,cd34`; the `cs:` prefix is stripped automatically if "
+    "you include it). Ids only, no prose, one Bash call. Omit if none "
+    "applied._"
 )
 
 
@@ -90,7 +105,11 @@ def parse_citation_command(command: str) -> list[str]:
     match = CITATION_CMD_RE.match(command or "")
     if not match:
         return []
-    return match.group(1).split(",")
+    ids: list[str] = []
+    for tok in _SPLIT_RE.split(match.group(1).strip()):
+        if clean := _CLEAN_ID_RE.match(tok):
+            ids.append(clean.group(1).lower())
+    return ids
 
 
 def ensure_installed() -> Path:

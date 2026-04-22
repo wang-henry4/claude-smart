@@ -9,10 +9,18 @@ Stop hook when it scans the session transcript — no session_id, no
 sidecar file, no state.
 
 Usage:
-    cs-cite <comma-separated-ids>
+    cs-cite <id> [<id>...]            # space- or comma-separated
 
-Example:
-    cs-cite ab12,cd34  ->  ✨ used 2 claude-smart learnings
+Accepts one or more 4-hex-char ids as arguments, separated by commas
+and/or whitespace. An optional ``cs:`` prefix is stripped for
+convenience, since playbook items render as ``[cs:ab12]`` and the model
+often copies the tag verbatim. Case is normalized to lowercase.
+
+Examples:
+    cs-cite ab12              -> ✨ used 1 claude-smart learning
+    cs-cite ab12,cd34         -> ✨ used 2 claude-smart learnings
+    cs-cite cs:ab12,cs:cd34   -> ✨ used 2 claude-smart learnings
+    cs-cite ab12 cd34         -> ✨ used 2 claude-smart learnings
 """
 
 from __future__ import annotations
@@ -20,23 +28,44 @@ from __future__ import annotations
 import re
 import sys
 
-_IDS_RE = re.compile(r"^[a-f0-9]{4}(?:,[a-f0-9]{4})*$")
+_TOKEN_RE = re.compile(r"^(?:cs:)?([a-f0-9]{4})$", re.IGNORECASE)
+_SPLIT_RE = re.compile(r"[,\s]+")
+_USAGE = (
+    "cs-cite: expected one or more 4-hex-char ids "
+    "(e.g. `cs-cite ab12,cd34` or `cs-cite cs:ab12`)\n"
+)
 
 
 def main() -> int:
+    """Parse ids from argv and print the TUI confirmation line.
+
+    Returns:
+        int: ``0`` on success, ``1`` when no valid ids were found.
+    """
     argv = sys.argv[1:]
-    if len(argv) != 1:
-        sys.stderr.write(
-            "cs-cite: expected exactly one comma-separated ids argument\n"
-        )
+    if not argv:
+        sys.stderr.write(_USAGE)
         return 1
-    if not _IDS_RE.match(argv[0]):
-        sys.stderr.write(
-            "cs-cite: ids must be comma-separated 4-hex-char tokens "
-            "(e.g. ab12,cd34)\n"
-        )
+    tokens = [t for t in _SPLIT_RE.split(" ".join(argv).strip()) if t]
+    if not tokens:
+        sys.stderr.write(_USAGE)
         return 1
-    n = argv[0].count(",") + 1
+    ids: list[str] = []
+    bad: list[str] = []
+    for tok in tokens:
+        if match := _TOKEN_RE.match(tok):
+            ids.append(match.group(1).lower())
+        else:
+            bad.append(tok)
+    if bad:
+        sys.stderr.write(
+            "cs-cite: ignoring invalid tokens (expected 4-hex-char ids, "
+            f"optionally 'cs:'-prefixed): {', '.join(bad)}\n"
+        )
+    if not ids:
+        sys.stderr.write(_USAGE)
+        return 1
+    n = len(ids)
     suffix = "" if n == 1 else "s"
     sys.stdout.write(f"✨ used {n} claude-smart learning{suffix}\n")
     return 0

@@ -35,7 +35,38 @@ def test_parse_citation_command_rejects_chained_commands() -> None:
 
 def test_parse_citation_command_rejects_non_hex_ids() -> None:
     assert cs_cite.parse_citation_command("cs-cite xxxx") == []
-    assert cs_cite.parse_citation_command("cs-cite AB12") == []  # uppercase
+    assert cs_cite.parse_citation_command("cs-cite toolong") == []
+
+
+def test_parse_citation_command_normalizes_uppercase() -> None:
+    """Uppercase ids are accepted and normalized to lowercase."""
+    assert cs_cite.parse_citation_command("cs-cite AB12") == ["ab12"]
+    assert cs_cite.parse_citation_command("cs-cite AB12,CD34") == ["ab12", "cd34"]
+
+
+def test_parse_citation_command_strips_cs_prefix() -> None:
+    """The `cs:` prefix from `[cs:xxxx]` tags is stripped automatically."""
+    assert cs_cite.parse_citation_command("cs-cite cs:ab12") == ["ab12"]
+    assert cs_cite.parse_citation_command("cs-cite cs:ab12,cs:cd34") == [
+        "ab12",
+        "cd34",
+    ]
+    assert cs_cite.parse_citation_command("cs-cite cs:ab12,cd34") == ["ab12", "cd34"]
+
+
+def test_parse_citation_command_accepts_uppercase_cs_prefix() -> None:
+    """An uppercase `CS:` prefix is tolerated — the bin script accepts it too."""
+    assert cs_cite.parse_citation_command("cs-cite CS:ab12") == ["ab12"]
+    assert cs_cite.parse_citation_command("cs-cite CS:AB12,Cs:CD34") == [
+        "ab12",
+        "cd34",
+    ]
+
+
+def test_parse_citation_command_accepts_whitespace_separators() -> None:
+    """Whitespace between ids is accepted alongside commas."""
+    assert cs_cite.parse_citation_command("cs-cite ab12 cd34") == ["ab12", "cd34"]
+    assert cs_cite.parse_citation_command("cs-cite ab12, cd34") == ["ab12", "cd34"]
 
 
 def test_parse_citation_command_rejects_embedded_path_traversal() -> None:
@@ -114,17 +145,38 @@ def test_cs_cite_script_prints_plural_line() -> None:
 def test_cs_cite_script_rejects_no_args() -> None:
     r = _run_cs_cite()
     assert r.returncode == 1
-    assert "expected exactly one" in r.stderr
+    assert "4-hex-char" in r.stderr
 
 
-def test_cs_cite_script_rejects_space_separated_ids() -> None:
-    """Stop-side regex requires comma separation; the script must agree."""
+def test_cs_cite_script_accepts_space_separated_argv() -> None:
+    """Multiple argv tokens are joined; Stop-side regex tolerates the shape."""
     r = _run_cs_cite("ab12", "cd34")
-    assert r.returncode == 1
-    assert "expected exactly one" in r.stderr
+    assert r.returncode == 0
+    assert r.stdout == "✨ used 2 claude-smart learnings\n"
+
+
+def test_cs_cite_script_strips_cs_prefix() -> None:
+    """Ids copied verbatim from `[cs:xxxx]` tags are accepted."""
+    r = _run_cs_cite("cs:ab12,cs:cd34,cs:ef56")
+    assert r.returncode == 0
+    assert r.stdout == "✨ used 3 claude-smart learnings\n"
+
+
+def test_cs_cite_script_normalizes_uppercase() -> None:
+    r = _run_cs_cite("AB12,CD34")
+    assert r.returncode == 0
+    assert r.stdout == "✨ used 2 claude-smart learnings\n"
 
 
 def test_cs_cite_script_rejects_non_hex_ids() -> None:
     r = _run_cs_cite("xxxx")
     assert r.returncode == 1
     assert "4-hex-char" in r.stderr
+
+
+def test_cs_cite_script_warns_on_mixed_valid_and_invalid() -> None:
+    """Valid ids still succeed; invalid tokens are flagged on stderr."""
+    r = _run_cs_cite("ab12,notahex,cd34")
+    assert r.returncode == 0
+    assert r.stdout == "✨ used 2 claude-smart learnings\n"
+    assert "notahex" in r.stderr

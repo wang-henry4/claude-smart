@@ -42,7 +42,25 @@ if [ -d "$REPO_ROOT/.git" ] && [ -f "$REPO_ROOT/.gitmodules" ]; then
 fi
 
 if ! command -v uv >/dev/null 2>&1; then
-  write_failure "uv is not on PATH — install from https://docs.astral.sh/uv/"
+  echo "[claude-smart] uv not found — installing from astral.sh..." >&2
+  if ! curl -LsSf https://astral.sh/uv/install.sh | sh >&2; then
+    write_failure "uv install failed — install manually from https://docs.astral.sh/uv/"
+  fi
+  claude_smart_prepend_astral_bins
+  if ! command -v uv >/dev/null 2>&1; then
+    UV_FOUND=""
+    for candidate in "$HOME/.local/bin/uv" "$HOME/.cargo/bin/uv" "$HOME/bin/uv"; do
+      if [ -x "$candidate" ]; then
+        UV_FOUND="$candidate"
+        break
+      fi
+    done
+    if [ -n "$UV_FOUND" ]; then
+      write_failure "uv installed at $UV_FOUND — add its parent directory to PATH in your shell rc"
+    else
+      write_failure "uv install reported success but binary not found — install manually from https://docs.astral.sh/uv/"
+    fi
+  fi
 fi
 
 cd "$PLUGIN_ROOT"
