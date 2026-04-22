@@ -12,6 +12,20 @@ npx claude-smart install   # or: uvx claude-smart install
 
 Then restart Claude Code.
 
+## Uninstall
+
+```bash
+npx claude-smart uninstall   # or: uvx claude-smart uninstall
+```
+
+Or run the equivalent command directly via the Claude Code CLI:
+
+```bash
+claude plugin uninstall claude-smart@reflexioai
+```
+
+Local data under `~/.reflexio/` and `~/.claude-smart/` is left in place — remove manually if desired.
+
 ## License
 
 Apache 2.0 — see [LICENSE](LICENSE).

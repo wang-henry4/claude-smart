@@ -6,6 +6,9 @@ Exposes five subcommands:
   Claude Code, then seed ``~/.reflexio/.env`` with the local-provider flags.
 - ``update``: update the plugin to the latest version via the native Claude
   Code plugin CLI.
+- ``uninstall``: remove the plugin from Claude Code via the native plugin
+  CLI. Local data under ``~/.reflexio/`` and ``~/.claude-smart/`` is left
+  in place.
 - ``show``: print the current project playbook and project user profiles
   (as markdown).
 - ``learn``: force reflexio to run extraction on all unpublished interactions.
@@ -142,6 +145,40 @@ def cmd_update(_args: argparse.Namespace) -> int:
         return exc.returncode or 1
 
     sys.stdout.write("\nclaude-smart updated. Restart Claude Code to apply.\n")
+    return 0
+
+
+def cmd_uninstall(_args: argparse.Namespace) -> int:
+    """Uninstall claude-smart from Claude Code via the native plugin CLI.
+
+    Runs ``claude plugin uninstall claude-smart@reflexioai``. Local data under
+    ``~/.reflexio/`` and ``~/.claude-smart/`` is left in place.
+
+    Args:
+        args (argparse.Namespace): Parsed CLI args (unused).
+
+    Returns:
+        int: 0 on success, non-zero if the ``claude`` CLI is missing or fails.
+    """
+    if not shutil.which("claude"):
+        sys.stderr.write(
+            "error: 'claude' CLI not found on PATH. "
+            "Install Claude Code first: https://claude.com/claude-code\n"
+        )
+        return 1
+
+    cmd = ["claude", "plugin", "uninstall", _PLUGIN_SPEC]
+    try:
+        subprocess.run(cmd, check=True)
+    except subprocess.CalledProcessError as exc:
+        sys.stderr.write(f"error: {' '.join(cmd)} failed (exit {exc.returncode})\n")
+        return exc.returncode or 1
+
+    sys.stdout.write(
+        "\nclaude-smart uninstalled. Restart Claude Code to apply.\n"
+        "Local data in ~/.reflexio/ and ~/.claude-smart/ was left in place — "
+        "remove manually if desired.\n"
+    )
     return 0
 
 
@@ -431,6 +468,9 @@ def _build_parser() -> argparse.ArgumentParser:
 
     upd = sub.add_parser("update", help="Update claude-smart to the latest version")
     upd.set_defaults(func=cmd_update)
+
+    uni = sub.add_parser("uninstall", help="Remove claude-smart from Claude Code")
+    uni.set_defaults(func=cmd_uninstall)
 
     sh = sub.add_parser(
         "show",

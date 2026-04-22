@@ -97,8 +97,16 @@ Then restart Claude Code.
 To uninstall:
 
 ```bash
-npx claude-smart uninstall     # or: claude plugin uninstall claude-smart@reflexioai
+npx claude-smart uninstall     # or: uvx claude-smart uninstall
 ```
+
+Or run the equivalent command directly via the Claude Code CLI:
+
+```bash
+claude plugin uninstall claude-smart@reflexioai
+```
+
+Local data under `~/.reflexio/` and `~/.claude-smart/` is left in place — remove manually if desired.
 
 Developing the plugin itself? See [DEVELOPER.md](./DEVELOPER.md#developing-locally).
 
