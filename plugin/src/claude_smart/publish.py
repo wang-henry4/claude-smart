@@ -27,8 +27,10 @@ def publish_unpublished(
     """Drain the session buffer to reflexio and stamp the high-water mark.
 
     Args:
-        session_id (str): Claude Code session id (also the reflexio user_id).
-        project_id (str): Stable project name (reflexio agent_version).
+        session_id (str): Claude Code session id, attached to each interaction.
+        project_id (str): Stable project name; used as both reflexio
+            ``agent_version`` (playbooks) and ``user_id`` (profiles), so both
+            entities accumulate at the project level across sessions.
         force_extraction (bool): Whether to ask reflexio to run extraction
             synchronously instead of queuing for the next sweep.
         skip_aggregation (bool): When True, reflexio extracts profiles and

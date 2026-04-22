@@ -36,7 +36,6 @@ def handle(payload: dict[str, Any]) -> None:
     project_id = ids.resolve_project_id(payload.get("cwd"))
     playbooks, profiles = Adapter().search_both(
         project_id=project_id,
-        session_id=session_id,
         query=query,
         top_k=_TOP_K,
     )

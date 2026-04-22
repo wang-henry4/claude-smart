@@ -31,7 +31,6 @@ def handle(payload: dict[str, Any]) -> None:
     )
     playbooks, profiles = adapter.fetch_both(
         project_id=project_id,
-        session_id=session_id,
     )
 
     markdown = context_format.render(
