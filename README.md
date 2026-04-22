@@ -18,6 +18,9 @@
   <a href="plugin/pyproject.toml">
     <img src="https://img.shields.io/badge/python-%3E%3D3.12-brightgreen.svg" alt="Python">
   </a>
+  <a href="package.json">
+    <img src="https://img.shields.io/badge/node-%3E%3D18-brightgreen.svg" alt="Node">
+  </a>
   <a href="#quick-start">
     <img src="https://img.shields.io/badge/llm-claude%20code%20cli-purple.svg" alt="LLM">
   </a>
@@ -34,27 +37,45 @@
 </p>
 
 <p align="center">
-  Every time you correct Claude Code, claude-smart turns that moment into a durable rule it follows from then on. No more re-explaining your stack, your conventions, or the same gotcha you flagged last week — Claude Code steadily adapts to how <i>your</i> codebase actually wants to be written, session after session.
+  It learns both corrections and successful execution patterns—so Claude Code avoids repeating mistakes and reuses what works. Instead of repeatedly explaining your stack, conventions, preferences, or the same gotchas, Claude Code steadily adapts to <i>how you like</i> to work—across projects, codebases, and sessions.
 </p>
 
 <p align="center">
-  <b>Head-to-head vs <code>claude-mem</code></b> (LLM-judged on how well each system's reinjected context matches the expected rule): claude-smart is <b>~2.7× more accurate overall</b>, <b>stops Claude from repeating mistakes you've already corrected</b> where claude-mem only recalls that they happened, and is <b>3× better at turning past events into future-facing rules</b> — see <a href="benchmarks/memory_comparison/EXPERIMENT.md">EXPERIMENT.md</a> for details.
+  <b>Head-to-head vs <code>claude-mem</code></b>, evaluated by an LLM on how well each system’s reinjected context matched the expected rule: claude-smart achieved <b>~2.7× higher overall accuracy</b>, is better at <b>preventing Claude Code from repeating mistakes you have already corrected</b> rather than merely recalling that those mistakes happened, and is <b>3× better at converting past events into future-facing rules</b> — see <a href="benchmarks/memory_comparison/EXPERIMENT.md">EXPERIMENT.md</a> for details.
 </p>
-
 ---
 
 ## Why Learning, Not Memory
 
-Plain memory solutions re-inject transcripts or summaries from prior sessions — useful for continuity, but purely informative. claude-smart extracts *rules* from those sessions instead. Four ways that changes what Claude Code can do for you:
+Most memory solutions re-inject transcripts or summaries from prior sessions, but it is still mostly informative—Claude remembers what happened, without necessarily changing what it does next.
 
-- **Actionable, not just informative.** Memory logs *what happened*; learning produces *rules to follow* that change the next decision.
-  > *e.g.* you told Claude to stop running `npm test` without `--run` because it hangs on watch mode. **Memory** recalls "user was annoyed about npm test hanging". **Learning** writes the rule *"always pass `--run` to `npm test` in this repo — default watch mode blocks CI"* and applies it next session.
-- **Preferences, not events.** Memory records literal facts; learning abstracts the *why* into rules that generalize.
-  > *e.g.* you reject Jest in favor of Vitest once. **Memory** stores that single choice. **Learning** derives *"prefer ESM-native test runners for this TypeScript monorepo"* — which also covers the next framework decision (e.g. picking `tsx` over `ts-node`) without waiting for the same correction to repeat.
-- **Carries across sessions and workspaces.** Playbooks are keyed to the project and surface in every future session against that repo.
-- **Compact.** Distilled, deduplicated rules stay in dozens of tokens — not thousands — even as the project grows.
+`claude-smart` focuses on learning instead.
 
-claude-smart's approach: **extract, don't accumulate**. Corrections and successful patterns are distilled into two artifacts — a session-scoped **user profile** and a cross-session **project playbook** (each rule with explicit `trigger` and `rationale`, deduplicated and archived as they evolve) — and reinjected at the start of every session.
+Four ways this changes what Claude Code can do for you:
+
+- **Actionable, not just informative:** Produces rules Claude can follow next time; memory only records what happened; 
+
+  > *Example:* you tell Claude to stop running `npm test` without `--run` because watch mode hangs.
+  > **Memory:** “user was annoyed about npm test hanging”
+  > **Learning:** “always pass `--run` to `npm test` in this repo — default watch mode blocks CI”
+
+- **Optimized paths, not just past events:** Preserves successful execution paths so Claude can reuse what already works.
+  > *Example:* Claude spends several iterations trying to start the local dev environment before discovering that this repo requires `pnpm dev:all` instead of the usual `npm run dev`.
+  > **Memory:** “user mentioned that `npm run dev` did not work”
+  > **Learning:** “for this repo, always use `pnpm dev:all` to start the full local stack — `npm run dev` only starts the frontend and causes missing service errors”  
+
+  Instead of re-exploring the same setup problem next time, Claude starts from the proven path—reducing planning steps, latency, and token usage.
+
+- **Project-wide, not session-siloed:** Session memory disappears with the conversation. The project playbook persists and improves across every session in that repo.
+
+- **Compact:** Distilled, deduplicated rules stay in dozens of tokens—not thousands—even as the project grows.
+
+claude-smart turns corrections and successful execution patterns into two artifacts:
+
+- **User Profile** → your preferences and working style across sessions
+- **Project Playbook** → durable rules and optimized execution paths for how Claude should behave
+
+Both are automatically reinjected at the start of every session, so Claude Code gets better the more you use it.
 
 ---
 
@@ -93,6 +114,32 @@ Developing the plugin itself? See [DEVELOPER.md](./DEVELOPER.md#developing-local
 
 ---
 
+## Dashboard
+
+A Next.js web UI lives in [`plugin/dashboard/`](plugin/dashboard/) for browsing session buffers, inspecting user profiles, and editing project playbooks. It auto-starts alongside the backend — just open **http://localhost:3001**.
+
+<p align="center">
+  <img src="assets/profile_dashboard.png" alt="Profile dashboard" width="49%">
+  <img src="assets/playbook_dashboard.png" alt="Playbook dashboard" width="49%">
+</p>
+
+---
+
+## How It Works
+
+claude-smart builds two artifacts as you work and injects them into Claude at the start of every new session:
+
+- **User profile** — session-scoped preferences (stack, role, small quirks). *e.g.* "uses pnpm, not npm"; "prefers terse answers"; "backend engineer — explain frontend with backend analogues."
+- **Project playbook** — durable, generalized rules accumulated across every session in the repo. Each says when it applies and why. *e.g.* "always pass `--run` to `npm test` — watch mode hangs CI"; "use real Postgres for integration tests — mocks once hid a broken migration."
+
+Rules clean themselves up: correct the same thing twice and they merge; change your mind and the old one is archived.
+
+Under the hood: hooks watch your turns, tool calls, and Claude's replies, auto-flagging corrections (or anything you `/tag`). At session end (or on `/learn`), [reflexio](https://github.com/ReflexioAI/reflexio) — the self-improving engine that powers claude-smart — extracts profile entries and playbook rules. Next session, both get injected into the system prompt — run `/show` to see what Claude is being told. Everything runs on your machine.
+
+See [ARCHITECTURE.md](./ARCHITECTURE.md) for hooks, data flow, and reflexio details.
+
+---
+
 ## Slash Commands
 
 | Command | What it does |
@@ -100,49 +147,6 @@ Developing the plugin itself? See [DEVELOPER.md](./DEVELOPER.md#developing-local
 | `/show` | Print the current project playbook plus the current session's user profiles (same markdown that `SessionStart` injects). Use it to audit what rules and preferences Claude is being told to follow. |
 | `/learn` | Force reflexio to run extraction *now* on the current session's unpublished interactions. Without this, extraction runs at the end of the session or on reflexio's batch interval. |
 | `/tag [note]` | Tag the most recent turn as a correction, for cases the automatic heuristic missed. The note becomes the correction description the extractor sees. |
-
----
-
-## Dashboard
-
-A Next.js web UI lives in [`plugin/dashboard/`](plugin/dashboard/) for browsing session buffers, inspecting user profiles, and editing project playbooks. It auto-starts alongside the backend — just open **http://localhost:3001**.
-
----
-
-## How It Works
-
-As you work, claude-smart builds two things and hands them back to Claude at the start of every new session:
-
-### Your user profile — *who you are, this session*
-
-A quick sketch of how you want to work right now — your stack, your role, small preferences you've dropped into the conversation. Scoped to the current session, so it doesn't follow you into unrelated projects.
-
-> *Examples:*
-> - *Uses pnpm, not npm.*
-> - *Prefers terse answers, no trailing summaries.*
-> - *Backend engineer — explain frontend code with backend analogues.*
-
-### The project playbook — *durable rules, every session*
-
-A growing list of **rules for this project**, pulled from every session you've ever run in it. Each rule says when it applies and why it exists.
-
-> *Examples:*
-> - *Always pass `--run` to `npm test` — default watch mode hangs CI.*
-> - *Use a real Postgres for integration tests, not mocks — mocks once hid a broken migration.*
-> - *Prefer ESM-native test runners in this monorepo.*
-
-Rules clean themselves up: correct the same thing twice and they merge; change your mind later and the old one is archived.
-
-### How it runs
-
-1. You have a normal Claude Code session.
-2. claude-smart quietly watches your turns, tool calls, and Claude's replies — flagging corrections automatically (or anything you `/tag`).
-3. When the session ends (or you run `/learn`), it turns what happened into profile entries and playbook rules.
-4. Next session, both get injected into Claude's system prompt. Run `/show` any time to see what Claude is being told.
-
-No chat, no prompts to rewrite, no config files to groom. Everything runs on your machine.
-
-See [ARCHITECTURE.md](./ARCHITECTURE.md) for the hooks, data flow, and reflexio details.
 
 ---
 
