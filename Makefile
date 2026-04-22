@@ -54,7 +54,7 @@ publish-pypi: ## Build and publish the current version to PyPI
 	@echo "→ uv build + uv publish"
 	rm -rf plugin/dist/
 	uv build --project plugin
-	uv publish --project plugin
+	uv publish --project plugin plugin/dist/*
 
 publish-dry: ## Show what would be published without uploading
 	@echo "→ npm publish --dry-run"
