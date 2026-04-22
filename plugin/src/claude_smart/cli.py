@@ -6,7 +6,7 @@ Exposes five subcommands:
   Claude Code, then seed ``~/.reflexio/.env`` with the local-provider flags.
 - ``update``: update the plugin to the latest version via the native Claude
   Code plugin CLI.
-- ``show``: print the current project playbook and session user profiles
+- ``show``: print the current project playbook and project user profiles
   (as markdown).
 - ``learn``: force reflexio to run extraction on all unpublished interactions.
 - ``tag "<note>"``: append a ``[correction]``-prefixed turn to the active
@@ -134,25 +134,23 @@ def cmd_update(_args: argparse.Namespace) -> int:
 
 
 def cmd_show(args: argparse.Namespace) -> int:
-    """Print the current project playbook and session user profiles.
+    """Print the current project playbook and project user profiles.
 
-    The session profile fetch defaults to the most-recently-modified session
-    buffer so ``/show`` surfaces both playbook rules and user profiles in one
-    pass, without the caller having to know the session id.
+    Both playbooks and profiles are now scoped to the project (resolved from
+    cwd via ``ids.resolve_project_id``), so output is identical regardless of
+    which session is active in the repo.
 
     Args:
         args (argparse.Namespace): Parsed CLI args. Honors ``args.project``
-            (override project id) and ``args.session`` (override session id;
-            falls back to the latest session buffer).
+            (override project id).
 
     Returns:
         int: 0 on success.
     """
     project_id = args.project or ids.resolve_project_id()
-    session_id = args.session or _latest_session_id()
     adapter = Adapter()
     playbooks = adapter.fetch_project_playbooks(project_id)
-    profiles: list = adapter.fetch_session_profiles(session_id) if session_id else []
+    profiles: list = adapter.fetch_project_profiles(project_id)
     md = context_format.render(
         project_id=project_id, playbooks=playbooks, profiles=profiles
     )
@@ -180,7 +178,7 @@ def cmd_learn(args: argparse.Namespace) -> int:
     if status == "ok":
         sys.stdout.write(
             f"Published {count} interactions to reflexio "
-            f"(user_id={session_id}, agent_version={project_id}). "
+            f"(user_id={project_id}, session_id={session_id}). "
             "Extraction running.\n"
         )
         return 0
@@ -272,13 +270,9 @@ def _build_parser() -> argparse.ArgumentParser:
 
     sh = sub.add_parser(
         "show",
-        help="Show the current project playbook and session user profiles",
+        help="Show the current project playbook and project user profiles",
     )
     sh.add_argument("--project", help="Override project id")
-    sh.add_argument(
-        "--session",
-        help="Session id for profile lookup (defaults to latest session)",
-    )
     sh.set_defaults(func=cmd_show)
 
     ln = sub.add_parser("learn", help="Force reflexio extraction now")

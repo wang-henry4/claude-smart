@@ -43,7 +43,7 @@ def render(
         sections.append("### Project playbook")
         sections.extend(playbook_lines)
     if profile_lines:
-        sections.append("### Session preferences")
+        sections.append("### Project preferences")
         sections.extend(profile_lines)
     return "\n".join(sections) + "\n"
 
@@ -81,7 +81,7 @@ def render_inline(
         sections.append("### Relevant playbook rules")
         sections.extend(playbook_lines)
     if profile_lines:
-        sections.append("### Relevant session preferences")
+        sections.append("### Relevant project preferences")
         sections.extend(profile_lines)
     return "\n".join(sections) + "\n"
 

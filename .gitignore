@@ -37,3 +37,6 @@ Thumbs.db
 
 # Experiment
 benchmarks/memory_comparison/results
+
+# Playwright MCP session dumps
+.playwright-mcp/

@@ -75,7 +75,7 @@ class Adapter:
             return False
         try:
             client.publish_interaction(
-                user_id=session_id,
+                user_id=project_id,
                 interactions=list(interactions),
                 agent_version=project_id,
                 session_id=session_id,
@@ -183,14 +183,14 @@ class Adapter:
             return []
         return _extract_items(response, "user_playbooks")
 
-    def fetch_session_profiles(self, session_id: str, top_k: int = 20) -> list[Any]:
-        """Fetch profiles extracted for this specific session."""
+    def fetch_project_profiles(self, project_id: str, top_k: int = 20) -> list[Any]:
+        """Fetch profiles extracted for this project (across sessions)."""
         client = self._get_client()
         if client is None:
             return []
         try:
             response = client.search_profiles(
-                user_id=session_id,
+                user_id=project_id,
                 query="",
                 top_k=top_k,
             )
@@ -230,12 +230,13 @@ class Adapter:
         return _extract_items(response, "user_playbooks")
 
     def search_profiles(
-        self, *, session_id: str, query: str, top_k: int = 5
+        self, *, project_id: str, query: str, top_k: int = 5
     ) -> list[Any]:
-        """Query-aware profile search scoped to this session.
+        """Query-aware profile search scoped to this project.
 
         Args:
-            session_id (str): reflexio user_id — profiles are session-scoped.
+            project_id (str): reflexio user_id — profiles are project-scoped
+                so they persist across sessions in the same repo.
             query (str): Free-text query.
             top_k (int): Cap on results.
 
@@ -247,7 +248,7 @@ class Adapter:
             return []
         try:
             response = client.search_profiles(
-                user_id=session_id,
+                user_id=project_id,
                 query=query,
                 top_k=top_k,
             )
@@ -264,7 +265,6 @@ class Adapter:
         self,
         *,
         project_id: str,
-        session_id: str,
         query: str,
         top_k: int = 5,
     ) -> tuple[list[Any], list[Any]]:
@@ -280,7 +280,7 @@ class Adapter:
                 project_id=project_id, query=query, top_k=top_k
             ),
             profile_call=lambda: self.search_profiles(
-                session_id=session_id, query=query, top_k=top_k
+                project_id=project_id, query=query, top_k=top_k
             ),
         )
 
@@ -288,7 +288,6 @@ class Adapter:
         self,
         *,
         project_id: str,
-        session_id: str,
         playbook_top_k: int = 10,
         profile_top_k: int = 20,
     ) -> tuple[list[Any], list[Any]]:
@@ -297,8 +296,8 @@ class Adapter:
             playbook_call=lambda: self.fetch_project_playbooks(
                 project_id, top_k=playbook_top_k
             ),
-            profile_call=lambda: self.fetch_session_profiles(
-                session_id, top_k=profile_top_k
+            profile_call=lambda: self.fetch_project_profiles(
+                project_id, top_k=profile_top_k
             ),
         )
 

@@ -3,11 +3,13 @@
 Two identifiers matter to reflexio:
 
 - ``session_id``: Claude Code's per-session id, passed in hook stdin. We
-  use this as ``user_id`` so reflexio-extracted profiles/playbooks are
-  scoped to the current conversation.
+  forward it to reflexio's interaction ``session_id`` field so individual
+  turns remain attributable to their conversation, but it is no longer
+  the scope key for extracted profiles.
 - ``project_id``: a stable, cross-session name for the project. We use
-  this as ``agent_version`` so playbooks accumulate at the project level
-  (queryable by ``agent_version`` alone in ``search_user_playbooks``).
+  this as both ``agent_version`` (playbooks roll up at the project level)
+  and reflexio's ``user_id`` for profiles, so user preferences extracted
+  in one session are visible to every later session in the same repo.
 """
 
 from __future__ import annotations

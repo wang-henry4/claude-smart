@@ -256,23 +256,6 @@ export default function PlaybookDetailPage({
             )}
 
             <Section
-              icon={BookMarked}
-              title="Rule"
-              hint="What Claude should do. Injected into future sessions in this project."
-            >
-              {editing ? (
-                <AutoTextarea
-                  value={form.content}
-                  onChange={(v) => setForm((f) => ({ ...f, content: v }))}
-                  rows={6}
-                  placeholder="e.g. Use anyio with trio backend — never pytest-asyncio."
-                />
-              ) : (
-                <Prose text={playbook?.content ?? ""} />
-              )}
-            </Section>
-
-            <Section
               icon={AlertTriangle}
               title="Trigger"
               hint="When this rule should apply. Leave empty if it always applies."
@@ -286,6 +269,23 @@ export default function PlaybookDetailPage({
                 />
               ) : (
                 <Prose text={playbook?.trigger ?? ""} muted={!playbook?.trigger} />
+              )}
+            </Section>
+
+            <Section
+              icon={BookMarked}
+              title="Rule"
+              hint="What Claude should do. Injected into future sessions in this project."
+            >
+              {editing ? (
+                <AutoTextarea
+                  value={form.content}
+                  onChange={(v) => setForm((f) => ({ ...f, content: v }))}
+                  rows={6}
+                  placeholder="e.g. Use anyio with trio backend — never pytest-asyncio."
+                />
+              ) : (
+                <Prose text={playbook?.content ?? ""} />
               )}
             </Section>
 
