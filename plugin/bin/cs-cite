@@ -20,10 +20,10 @@ stripped for convenience since the model often copies the tag
 verbatim. Case is normalized to lowercase.
 
 Examples:
-    cs-cite p1-ab12                 -> ✨ used 1 claude-smart learning
-    cs-cite p1-ab12,r2-cd34         -> ✨ used 2 claude-smart learnings
-    cs-cite cs:p1-ab12,cs:r2-cd34   -> ✨ used 2 claude-smart learnings
-    cs-cite p1-ab12 r2-cd34         -> ✨ used 2 claude-smart learnings
+    cs-cite p1-ab12                 -> ✨ 1 claude-smart learning applied
+    cs-cite p1-ab12,r2-cd34         -> ✨ 2 claude-smart learnings applied
+    cs-cite cs:p1-ab12,cs:r2-cd34   -> ✨ 2 claude-smart learnings applied
+    cs-cite p1-ab12 r2-cd34         -> ✨ 2 claude-smart learnings applied
 """
 
 from __future__ import annotations
@@ -70,7 +70,7 @@ def main() -> int:
         return 1
     n = len(ids)
     suffix = "" if n == 1 else "s"
-    sys.stdout.write(f"✨ used {n} claude-smart learning{suffix}\n")
+    sys.stdout.write(f"✨ {n} claude-smart learning{suffix} applied\n")
     return 0
 
 

@@ -19,6 +19,7 @@
 VERSION_FILES := package.json plugin/pyproject.toml \
                  plugin/.claude-plugin/plugin.json .claude-plugin/marketplace.json \
                  README.md
+LOCK_FILES    := plugin/uv.lock
 
 help:
 	@awk 'BEGIN{FS=":.*##"} /^[a-zA-Z_-]+:.*##/{printf "  %-20s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -43,6 +44,8 @@ bump: check-version ## Rewrite version in all 4 manifests
 	@rm -f package.json.bak plugin/pyproject.toml.bak \
 	       plugin/.claude-plugin/plugin.json.bak .claude-plugin/marketplace.json.bak \
 	       README.md.bak
+	@echo "→ refreshing uv lockfile"
+	@uv lock --project plugin
 	@echo "→ resulting versions:"
 	@grep -HE '("version"|^version)' $(VERSION_FILES)
 
@@ -69,7 +72,7 @@ publish: publish-npm publish-pypi ## Publish to both npm and PyPI
 
 release: check-version check-clean bump ## Bump + commit + tag + publish + push
 	@echo "→ committing release v$(VERSION)"
-	git add $(VERSION_FILES)
+	git add $(VERSION_FILES) $(LOCK_FILES)
 	git commit -m "Release v$(VERSION)"
 	git tag -a v$(VERSION) -m "Release v$(VERSION)"
 	@$(MAKE) publish
