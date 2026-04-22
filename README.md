@@ -37,19 +37,13 @@
 </p>
 
 <p align="center">
-  It learns both corrections and successful execution patterns—so Claude Code avoids repeating mistakes and reuses what works. Instead of repeatedly explaining your stack, conventions, preferences, or the same gotchas, Claude Code steadily adapts to <i>how you like</i> to work—across projects, codebases, and sessions.
+  It learns both corrections and successful execution patterns—so Claude Code avoids repeating mistakes and reuses what works. Claude Code steadily adapts to <i>how you like</i> to work—across projects, codebases, and sessions.
 </p>
 
 <p align="center">
   <b>Head-to-head vs <code>claude-mem</code>.</b> Evaluated across 12 scripted scenarios.
-</p>
-
-<p align="center">
-  <b>~2.7× higher overall quality.</b> &nbsp;·&nbsp; <b>User correction:</b> right rule learnt every time vs none.
-</p>
-
-<p align="center">
-  See <a href="benchmarks/memory_comparison/EXPERIMENT.md">EXPERIMENT.md</a> for details.
+  <br>
+  <b>~2.7× higher overall quality </b> &nbsp;·&nbsp; <b>User correction:</b> right rule learnt every time vs none  &nbsp;·&nbsp; See <a href="benchmarks/memory_comparison/EXPERIMENT.md">EXPERIMENT.md</a> for details.
 </p>
 
 ---
