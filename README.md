@@ -41,16 +41,17 @@
 </p>
 
 <p align="center">
-  <b>Head-to-head vs <code>claude-mem</code>.</b> Evaluated across 12 scripted scenarios; an LLM judge scored each system's output on two things: <b>recall</b> — did it capture the expected rule — and <b>rule quality</b> — is it good enough for Claude to act on?
+  <b>Head-to-head vs <code>claude-mem</code>.</b> Evaluated across 12 scripted scenarios.
 </p>
 
 <p align="center">
-  <b>~2.7× higher overall accuracy.</b> &nbsp;·&nbsp; <b>Corrections:</b> right rule learnt every time vs none. &nbsp;·&nbsp; <b>Rules inferred from past events: 3× better.</b> &nbsp;·&nbsp; Tie on one-off personal facts.
+  <b>~2.7× higher overall quality.</b> &nbsp;·&nbsp; <b>User correction:</b> right rule learnt every time vs none.
 </p>
 
 <p align="center">
   See <a href="benchmarks/memory_comparison/EXPERIMENT.md">EXPERIMENT.md</a> for details.
 </p>
+
 ---
 
 ## Why Learning, Not Memory
