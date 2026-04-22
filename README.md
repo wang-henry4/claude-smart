@@ -6,7 +6,7 @@
   claude-smart
 </h1>
 
-<h4 align="center">The <a href="https://claude.com/claude-code" target="_blank">Claude Code</a> plugin that makes Claude Code self-improve as you use it — not by remembering past sessions, but by turning your corrections into rules it actually follows next time.</h4>
+<h4 align="center">The <a href="https://claude.com/claude-code" target="_blank">Claude Code</a> plugin that makes Claude Code self-improve as you use it — not by remembering past sessions, but by turning your corrections into playbooks it actually follows next time.</h4>
 
 <p align="center">
   <a href="LICENSE">
@@ -47,13 +47,13 @@
 
 ## Why Learning, Not Memory
 
-Most memory solutions re-inject transcripts or summaries from prior sessions, but it is still mostly informative—Claude remembers what happened, without necessarily changing what it does next.
+Most memory solutions are still mostly informative—Claude remembers what happened, without necessarily changing what it does next.
 
 `claude-smart` focuses on learning instead.
 
 Four ways this changes what Claude Code can do for you:
 
-- **Actionable, not just informative:** Produces rules Claude can follow next time; memory only records what happened; 
+- **Actionable, not just informative:** Produces playbooks Claude can follow next time; memory only records what happened.
 
   > *Example:* you tell Claude to stop running `npm test` without `--run` because watch mode hangs.
   > **Memory:** “user was annoyed about npm test hanging”
@@ -68,7 +68,7 @@ Four ways this changes what Claude Code can do for you:
 
 - **Project-wide, not session-siloed:** Session memory disappears with the conversation. The project playbook persists and improves across every session in that repo.
 
-- **Compact:** Distilled, deduplicated rules stay in dozens of tokens—not thousands—even as the project grows.
+- **Compact:** Distilled, deduplicated playbooks stay in dozens of tokens—not thousands—even as the project grows.
 
 claude-smart turns corrections and successful execution patterns into two artifacts:
 
@@ -85,16 +85,20 @@ Both are automatically reinjected at the start of every session, so Claude Code 
 npx claude-smart install     # or: uvx claude-smart install
 ```
 
-Or run the equivalent marketplace commands directly inside Claude Code:
+Or run the equivalent marketplace commands directly via the Claude Code CLI:
 
-```text
-/plugin marketplace add ReflexioAI/claude-smart
-/plugin install claude-smart@reflexioai
+```bash
+claude plugin marketplace add ReflexioAI/claude-smart
+claude plugin install claude-smart@reflexioai
 ```
 
 Then restart Claude Code.
 
-To uninstall: `/plugin uninstall claude-smart@reflexioai`.
+To uninstall:
+
+```bash
+npx claude-smart uninstall     # or: claude plugin uninstall claude-smart@reflexioai
+```
 
 Developing the plugin itself? See [DEVELOPER.md](./DEVELOPER.md#developing-locally).
 
@@ -104,7 +108,7 @@ Developing the plugin itself? See [DEVELOPER.md](./DEVELOPER.md#developing-local
 
 - 🧠 **Learn, don't just remember** — Corrections become structured, deduplicated rules, not transcript replays.
 - ⚡ **Fully automatic learning** — Every user turn, tool call, and assistant response is captured via lifecycle hooks and extracted into rules without you running anything.
-- 📈 **Compounds with every session** — Rules auto-merge, supersede, and archive as your project evolves — the playbook sharpens with use instead of bloating.
+- 📈 **Updates with every session** — Playbooks auto-merge, supersede, and archive as your project evolves — the playbook sharpens with use instead of bloating.
   > *e.g.* you correct the same `npm test --run` gotcha twice → **claude-smart** consolidates them into one stronger rule. Later you switch the policy to `pnpm test` → the old rule is archived and the new one supersedes it, no manual cleanup.
 - 🎯 **Two-tier scope** — Per-session profiles for the current conversation; cross-session playbooks for the whole project.
 - 🔌 **No external API call** — semantic search runs on an in-process ONNX embedder (all-MiniLM-L6-v2), and all data (profiles, playbooks, interaction buffers) is stored locally on your machine (`~/.reflexio/` and `~/.claude-smart/`).
@@ -132,7 +136,7 @@ claude-smart builds two artifacts as you work and injects them into Claude at th
 - **User profile** — session-scoped preferences (stack, role, small quirks). *e.g.* "uses pnpm, not npm"; "prefers terse answers"; "backend engineer — explain frontend with backend analogues."
 - **Project playbook** — durable, generalized rules accumulated across every session in the repo. Each says when it applies and why. *e.g.* "always pass `--run` to `npm test` — watch mode hangs CI"; "use real Postgres for integration tests — mocks once hid a broken migration."
 
-Rules clean themselves up: correct the same thing twice and they merge; change your mind and the old one is archived.
+Playbooks clean themselves up: correct the same thing twice and they merge; change your mind and the old one is archived.
 
 Under the hood: hooks watch your turns, tool calls, and Claude's replies, auto-flagging corrections (or anything you `/tag`). At session end (or on `/learn`), [reflexio](https://github.com/ReflexioAI/reflexio) — the self-improving engine that powers claude-smart — extracts profile entries and playbook rules. Next session, both get injected into the system prompt — run `/show` to see what Claude is being told. Everything runs on your machine.
 
@@ -144,7 +148,7 @@ See [ARCHITECTURE.md](./ARCHITECTURE.md) for hooks, data flow, and reflexio deta
 
 | Command | What it does |
 | --- | --- |
-| `/show` | Print the current project playbook plus the current session's user profiles (same markdown that `SessionStart` injects). Use it to audit what rules and preferences Claude is being told to follow. |
+| `/show` | Print the current project playbook plus the current session's user profiles (same markdown that `SessionStart` injects). Use it to audit what playbooks and preferences Claude is being told to follow. |
 | `/learn` | Force reflexio to run extraction *now* on the current session's unpublished interactions. Without this, extraction runs at the end of the session or on reflexio's batch interval. |
 | `/tag [note]` | Tag the most recent turn as a correction, for cases the automatic heuristic missed. The note becomes the correction description the extractor sees. |
 | `/restart` | Restart the reflexio backend and dashboard to pick up new changes (e.g. after upgrading the plugin or editing local reflexio code). |
