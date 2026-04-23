@@ -216,49 +216,142 @@ rm -f package.json.bak pyproject.toml.bak .claude-plugin/*.bak
 
 ## Developing locally
 
-For iterating on claude-smart itself — editing hooks, the Python package, the reflexio patch, or the install CLIs — install from a clone and point Claude Code at your working copy. This is the setup end users *don't* need; the `npx`/`uvx` install flow in the README covers them.
+For iterating on claude-smart itself — editing hooks, the Python package, the dashboard, or the reflexio submodule — install from a clone and point Claude Code at your working copy. End users don't need any of this; the `npx`/`uvx` install flow in the README covers them.
 
-### Step 1 — Clone with the reflexio submodule
+### Two independent axes
+
+You can flip each axis independently — e.g. local plugin + PyPI reflexio is a valid combination (you're touching hooks/slash commands/dashboard but not the backend), and so is remote plugin + local reflexio (smoke-test the shipped plugin against a patched backend).
+
+| Axis | Local | Remote | Controlled by |
+| --- | --- | --- | --- |
+| **Plugin** — hooks, slash commands, Python package, dashboard | this repo's `plugin/` (marketplace `reflexioai-local`) | GitHub cache `~/.claude/plugins/cache/reflexioai/…` | `.claude/settings.local.json` → `enabledPlugins` |
+| **reflexio** — backend, extraction, storage | vendored submodule at `reflexio/` (editable) | PyPI wheel `reflexio-ai` | `plugin/pyproject.toml` → `[tool.uv.sources]` |
+
+### Fast path: one-shot setup for "everything local"
 
 ```bash
 git clone --recurse-submodules https://github.com/ReflexioAI/claude-smart.git
 cd claude-smart
-
-# If you forgot --recurse-submodules
-git submodule update --init --recursive
+bash scripts/setup-local-dev.sh
 ```
 
-### Step 2 — Install Python dependencies
+Idempotent. This single script handles everything — see its header comment for the full list, but in summary it:
 
-```bash
-uv sync
+1. Initializes the `reflexio/` submodule.
+2. Uncomments `[tool.uv.sources]` in `plugin/pyproject.toml` (absolute path to the submodule) and hides the divergence with `git update-index --skip-worktree`.
+3. `uv sync` in `plugin/`.
+4. Appends `CLAUDE_SMART_USE_LOCAL_CLI=1` and `CLAUDE_SMART_USE_LOCAL_EMBEDDING=1` to `~/.reflexio/.env`.
+5. Registers the local marketplace (`local-marketplace/`, manifest name `reflexioai-local`) at user scope via `claude plugin marketplace add`.
+6. Writes `.claude/settings.local.json` → enable `claude-smart@reflexioai-local`, disable `claude-smart@reflexioai`.
+7. Force-sets `~/.reflexio/plugin-root` → `plugin/` so slash commands resolve to editable in-repo sources.
+
+**Then restart Claude Code.** That's the only manual step.
+
+### Switching axis 1 — plugin source (local ↔ remote)
+
+Edit `.claude/settings.local.json` to flip which variant is enabled (both must be present so the other one is explicitly disabled and can't shadow):
+
+```jsonc
+// local plugin
+"enabledPlugins": {
+  "claude-smart@reflexioai-local": true,
+  "claude-smart@reflexioai": false
+}
+```
+```jsonc
+// remote plugin
+"enabledPlugins": {
+  "claude-smart@reflexioai-local": false,
+  "claude-smart@reflexioai": true
+}
 ```
 
-Creates `.venv/`, pulls `reflexio-ai` as a path dep from `reflexio/`, and registers the `claude-smart` and `claude-smart-hook` console scripts.
+Prerequisites (one-time, already done by `setup-local-dev.sh`):
+- Local marketplace registered at user scope: `claude plugin marketplace add $PWD/local-marketplace`.
+- Remote marketplace registered at user scope (`~/.claude/settings.json` → `extraKnownMarketplaces.reflexioai` → `github: ReflexioAI/claude-smart`).
 
-### Step 3 — Enable the local providers in reflexio
+**Apply the change:** restart Claude Code. In the new session, `/plugin` must show **exactly one** `claude-smart@…` entry (if it shows two, the scopes are stacking).
+
+Optional: if you juggle local and remote across different repos on the same machine and want slash commands to always follow whichever plugin this session loaded, set `CLAUDE_SMART_PLUGIN_ROOT_FOLLOW_SESSION=1` in `~/.reflexio/.env`. Off by default so a local-dev symlink is preserved when a remote-plugin session fires on the same machine.
+
+#### What's picked up automatically vs. what needs a restart (local plugin mode)
+
+- `plugin/src/claude_smart/` — Python package edits are live on the next hook invocation (hooks shell out via `uv run`). No restart needed.
+- `plugin/commands/*.md`, `plugin/hooks/hooks.json` — picked up on the next Claude Code session.
+- `plugin/dashboard/` — the dashboard runs `npm run start` against prebuilt `.next/`, long-lived across sessions. Rebuild + restart: `/claude-smart:restart` or `claude-smart restart`.
+
+### Switching axis 2 — reflexio source (submodule ↔ PyPI)
+
+Edit `plugin/pyproject.toml`. The `[tool.uv.sources]` block is what decides.
+
+```toml
+# local submodule (editable)
+[tool.uv.sources]
+reflexio-ai = { path = "/absolute/path/to/repo/reflexio", editable = true }
+```
+```toml
+# PyPI — just delete or comment out the block above
+# [tool.uv.sources]
+# reflexio-ai = { path = "/absolute/path/to/repo/reflexio", editable = true }
+```
+
+**Important — absolute path required.** `uv run --project <symlink>` resolves relative paths against the literal symlink, not its realpath. Since slash commands pass `~/.reflexio/plugin-root` as `--project`, a relative `../reflexio` would resolve to `$HOME/.reflexio/reflexio` (nonexistent). Always use the absolute path.
+
+**Note — git invisibility.** `setup-local-dev.sh` runs `git update-index --skip-worktree plugin/pyproject.toml plugin/uv.lock`, so edits to these files are **invisible** to `git status`. If you need to commit a genuine change:
 
 ```bash
+git update-index --no-skip-worktree plugin/pyproject.toml plugin/uv.lock
+# stage hunks selectively, commit
+git update-index --skip-worktree plugin/pyproject.toml plugin/uv.lock
+```
+
+**Apply the change:**
+
+```bash
+cd plugin && uv sync --quiet
+claude-smart restart                  # or /claude-smart:restart inside Claude Code
+```
+
+`uv sync` re-resolves the dependency. The **backend service must be restarted** — it's a long-lived process on port 8071 with the old `reflexio-ai` already imported in memory, so editing `pyproject.toml` alone does nothing until the service reloads.
+
+Verify:
+
+```bash
+uv run --project plugin python -c "import reflexio, os; print(reflexio.__version__); print(os.path.dirname(reflexio.__file__))"
+```
+
+- Path into `reflexio/reflexio/` under this repo → **submodule** (editable).
+- Path into `…/site-packages/reflexio/` → **PyPI**.
+
+### Manual setup (alternative to setup-local-dev.sh)
+
+If you want to understand the pieces or do a subset:
+
+```bash
+# 1. Clone + submodule
+git clone --recurse-submodules https://github.com/ReflexioAI/claude-smart.git
+cd claude-smart
+git submodule update --init --recursive    # if you forgot --recurse-submodules
+
+# 2. Python deps
+cd plugin && uv sync && cd ..
+# Creates plugin/.venv/ and registers claude-smart + claude-smart-hook scripts.
+
+# 3. Local providers (no API key needed)
 mkdir -p ~/.reflexio
 grep -q '^CLAUDE_SMART_USE_LOCAL_CLI=' ~/.reflexio/.env 2>/dev/null \
   || echo 'CLAUDE_SMART_USE_LOCAL_CLI=1' >> ~/.reflexio/.env
 grep -q '^CLAUDE_SMART_USE_LOCAL_EMBEDDING=' ~/.reflexio/.env 2>/dev/null \
   || echo 'CLAUDE_SMART_USE_LOCAL_EMBEDDING=1' >> ~/.reflexio/.env
-```
+# On first use the embedder downloads ~80 MB ONNX weights to ~/.cache/chroma/onnx_models/.
 
-(Equivalent to what the published install wrapper does for end users.) On first use the embedder downloads the ~80 MB ONNX model once to `~/.cache/chroma/onnx_models/`.
-
-### Step 4 — Start the reflexio backend
-
-Run from the `plugin/` directory (where `pyproject.toml` and `uv.lock` live) so that `uv run` uses the claude-smart venv — which already has `chromadb` installed for the local embedder and `reflexio-ai` available with the `reflexio` CLI script registered:
-
-```bash
+# 4. (Optional) start the backend manually instead of letting SessionStart spawn it
 cd plugin && BACKEND_PORT=8071 uv run reflexio services start --only backend --no-reload
+# Health check: curl http://localhost:8071/health  →  {"status":"healthy"}
+# Stop:         uv run reflexio services stop
 ```
 
-`BACKEND_PORT=8071` matches the port the plugin's `SessionStart` hook uses (reflexio's library default is 8081 — we override to keep the plugin's backend off that well-known port).
-
-Expected log lines:
+Expected backend log lines:
 
 ```
 Registered claude-code LiteLLM provider (cli=/path/to/claude)
@@ -269,108 +362,9 @@ Embedding provider: local
 Application startup complete.
 ```
 
-Health check: `curl http://localhost:8071/health` → `{"status":"healthy"}`. Stop with `uv run reflexio services stop`.
+Then flip the two axes by hand per the sections above.
 
-### Step 5 — Pick an install mode: local working copy vs. remote marketplace
-
-`claude-smart` can be loaded two ways, and you can only have **one enabled at a time**. Claude Code merges `enabledPlugins` across user + project scopes, so enabling both spawns duplicate slash commands, duplicate SessionStart hooks, and a race on ports 8071 / 3001.
-
-| Mode | `enabledPlugins` key | Source | Use when |
-| --- | --- | --- | --- |
-| **Local** | `claude-smart@claude-smart-local` | `directory` → this repo | Iterating on plugin code, hooks, dashboard, or reflexio submodule |
-| **Remote** | `claude-smart@reflexioai` | GitHub `ReflexioAI/claude-smart` | Smoke-testing a published release; using the plugin in unrelated projects |
-
-#### Mode A — test the local working copy (recommended for dev in this repo)
-
-Write a project-scoped `.claude/settings.local.json` that adds a `directory` marketplace and disables the remote so it can't shadow the local copy:
-
-```bash
-mkdir -p .claude
-cat > .claude/settings.local.json <<JSON
-{
-  "extraKnownMarketplaces": {
-    "claude-smart-local": {
-      "source": { "source": "directory", "path": "$PWD" }
-    }
-  },
-  "enabledPlugins": {
-    "claude-smart@claude-smart-local": true,
-    "claude-smart@reflexioai": false
-  }
-}
-JSON
-```
-
-The `"claude-smart@reflexioai": false` line explicitly overrides whatever is in `~/.claude/settings.json` for this project only — without it, both copies load side-by-side.
-
-**User-level** variant (all projects use the local copy): put the same JSON into `~/.claude/settings.json` with an absolute path, and drop the `@reflexioai: false` line since there's nothing to shadow anymore.
-
-Restart Claude Code. Changes to `plugin/` are picked up on the next session; changes to `plugin/src/claude_smart/` are picked up on the next hook invocation (hooks shell out via `uv run`, so editing the Python package takes effect immediately without a restart).
-
-Edits to the `reflexio/` submodule or `plugin/dashboard/` source are **not** picked up automatically — the SessionStart hook leaves the backend (port 8071) and the dashboard's `npm run start` against prebuilt `.next/` (port 3001) long-lived across sessions. Use the built-in restart command:
-
-```
-/claude-smart:restart          # inside Claude Code
-claude-smart restart           # from the shell
-```
-
-Runs `backend-service.sh stop` and `dashboard-service.sh stop`, then `npm run build` in `plugin/dashboard/`, then starts both services again. Flags: `--skip-backend`, `--skip-dashboard`, `--no-rebuild` for partial restarts (e.g. `--no-rebuild` when only the reflexio Python source changed).
-
-#### Mode B — test the published remote plugin
-
-The remote marketplace is declared once at the user level:
-
-```bash
-# ~/.claude/settings.json
-{
-  "extraKnownMarketplaces": {
-    "reflexioai": { "source": { "source": "github", "repo": "ReflexioAI/claude-smart" } }
-  },
-  "enabledPlugins": { "claude-smart@reflexioai": true }
-}
-```
-
-In any repo **without** a local marketplace override, that's all you need. Pull the latest published version with either:
-
-```bash
-npx claude-smart update
-# or, directly:
-claude plugin update claude-smart@reflexioai
-```
-
-To force Mode B inside *this* repo (e.g. to verify a release candidate behaves the same way end users will see it), flip the project-scoped file:
-
-```jsonc
-// .claude/settings.local.json
-{
-  "enabledPlugins": {
-    "claude-smart@claude-smart-local": false,
-    "claude-smart@reflexioai": true
-  }
-}
-```
-
-Restart Claude Code.
-
-#### Verifying which mode is live
-
-Inside Claude Code, `/plugin` lists enabled plugins with their marketplace suffix. You should see **exactly one** `claude-smart@...` entry — if you see two, the scopes are stacking.
-
-From the shell, inspect both scopes directly:
-
-```bash
-jq '.enabledPlugins' ~/.claude/settings.json
-jq '.enabledPlugins' .claude/settings.local.json 2>/dev/null
-```
-
-And confirm the loaded plugin's on-disk location:
-
-```bash
-ls -la ~/.claude/plugins/cache/reflexioai/claude-smart/    # Mode B only
-ls -la "$PWD/plugin"                                       # Mode A source of truth
-```
-
-### Step 6 — Sanity check
+### Sanity check
 
 Inside Claude Code:
 
@@ -378,18 +372,28 @@ Inside Claude Code:
 /show
 ```
 
-On a fresh project: `_No playbook or profiles yet for project `<name>`._`. Have a conversation, correct Claude on something (e.g. `"no, don't use X — use Y"`), then run `/learn`. After ~20–30 seconds, `/show` will surface the new rule.
+On a fresh project: `_No playbook or profiles yet for project <name>._`. Have a conversation, correct Claude on something (e.g. `"no, don't use X — use Y"`), then run `/learn`. After ~20–30 seconds, `/show` surfaces the new rule.
+
+### Verifying which mode is live
+
+```bash
+# Axis 1 — plugin source
+jq '.enabledPlugins' ~/.claude/settings.json
+jq '.enabledPlugins' .claude/settings.local.json 2>/dev/null
+readlink ~/.reflexio/plugin-root
+# → $PWD/plugin  (local)   or   ~/.claude/plugins/cache/reflexioai/claude-smart/<ver>  (remote)
+
+# Axis 2 — reflexio source
+uv run --project plugin python -c "import reflexio, os; print(reflexio.__version__); print(os.path.dirname(reflexio.__file__))"
+```
 
 ### Exercising the install CLIs against a local marketplace
 
 Useful when you're modifying the `install` subcommand itself and want to test without re-publishing:
 
 ```bash
-# Python path
-uv run --project plugin claude-smart install --source $PWD
-
-# Node path
-node bin/claude-smart.js install --source $PWD
+uv run --project plugin claude-smart install --source $PWD    # Python path
+node bin/claude-smart.js install --source $PWD                # Node path
 ```
 
 Both accept either a GitHub `owner/repo` ref or an absolute path to a local directory containing `.claude-plugin/marketplace.json`.

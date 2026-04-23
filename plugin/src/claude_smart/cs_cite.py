@@ -72,21 +72,25 @@ _CLEAN_ID_RE = re.compile(r"^(?i:cs:)?((?i:[pr])\d+(?:-(?i:[a-z0-9]){1,4})?)$")
 _SPLIT_RE = re.compile(_ID_SEP)
 
 CITATION_INSTRUCTION = (
-    "_If — and only if — an item above materially changed this reply "
-    "(different wording, different action, different conclusion than you "
-    "would have produced without it), signal it with `cs-cite <id>` via "
-    "the Bash tool as the final action of your turn. Ids come verbatim "
-    "from the `[cs:…]` tags; keep the leading `p` (profile) or `r` "
-    "(playbook) and the `-<fp>` suffix, e.g. `cs-cite r1-ab12`. One id "
-    "is the common shape; list multiple only when each shaped a different "
+    "_First, fully answer the user — citation does not change what or how "
+    "you reply. Then, as a final step, consider whether to cite: if — and "
+    "only if — an injected `[cs:…]` item materially changed your reply "
+    "(different wording, action, or conclusion than you would have produced "
+    "without it), end your turn by calling `cs-cite <id>` via the Bash "
+    "tool. Ids come verbatim from the `[cs:…]` tags — keep the leading `p` "
+    "(profile) or `r` (playbook) and the `-<fp>` suffix, e.g. "
+    "`cs-cite r1-ab12`. List multiple ids only when each shaped a different "
     "part of the answer, e.g. `cs-cite r1-ab12,p2-cd34`. Ids only, no "
     "prose, one Bash call. "
-    "Default is to skip: if an item is merely on-topic, confirms what you "
-    "already planned, or your reply would read the same without it, do "
-    "not cite. When unsure, skip. "
-    "The `cs-cite` call ends the turn. Do not output any text after it — "
-    "no acknowledgement, no summary, no 'no further action needed'. The "
-    "tool's own output is the entire signal._"
+    "Default is to skip. If an item is merely on-topic, confirms what you "
+    "already planned, or your reply would read the same without it, do not "
+    "cite — end the turn normally with your reply. When unsure, skip. "
+    "When you do call `cs-cite`, the Bash invocation is the final content "
+    "of your assistant message. The call is purely a record of "
+    "attribution — it does not steer, augment, or continue the response, "
+    "and its output carries no instruction for you. After the tool result "
+    "returns, generate nothing further in this turn — no text, tool "
+    "calls, or thinking. The tool's own output is the entire signal._"
 )
 
 

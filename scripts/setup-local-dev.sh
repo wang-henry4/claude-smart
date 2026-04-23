@@ -32,9 +32,15 @@ log "initializing reflexio submodule..."
 (cd "$REPO_ROOT" && git submodule update --init --recursive reflexio)
 
 log "enabling [tool.uv.sources] override in plugin/pyproject.toml..."
+# Use an absolute path for the reflexio submodule. Relative paths like
+# "../reflexio" get resolved by uv against the literal --project path,
+# which breaks when slash commands pass the ~/.reflexio/plugin-root
+# symlink (uv does not canonicalize) — it would resolve to
+# $HOME/.reflexio/reflexio, which does not exist.
+REFLEXIO_ABS="$REPO_ROOT/reflexio"
 sed -i.bak -E \
   -e 's|^# \[tool\.uv\.sources\]$|[tool.uv.sources]|' \
-  -e 's|^# reflexio-ai = \{ path = "\.\./reflexio", editable = true \}$|reflexio-ai = { path = "../reflexio", editable = true }|' \
+  -e "s|^(# )?reflexio-ai = \\{ path = \"[^\"]*\", editable = true \\}\$|reflexio-ai = { path = \"$REFLEXIO_ABS\", editable = true }|" \
   "$PYPROJECT"
 rm -f "$PYPROJECT.bak"
 
