@@ -143,6 +143,15 @@ Playbooks clean themselves up: correct the same thing twice and they merge; chan
 
 Under the hood: hooks watch your turns, tool calls, and Claude's replies, auto-flagging corrections (or anything you `/tag`). At session end (or on `/learn`), [reflexio](https://github.com/ReflexioAI/reflexio) — the self-improving engine that powers claude-smart — extracts profile entries and playbook rules. Next session, both get injected into the system prompt — run `/show` to see what Claude is being told. Everything runs on your machine.
 
+**Citations (`cs-cite`).** At the end of a reply, Claude may run:
+
+```
+⏺ Bash(cs-cite p1-2d57)
+  ⎿  ✨ 1 claude-smart learning applied
+```
+
+That signals a profile entry (`p…`) or playbook rule (`r…`) materially shaped the reply. Open the interaction's detail page in the [dashboard](#dashboard) to see the exact cited item.
+
 See [ARCHITECTURE.md](./ARCHITECTURE.md) for hooks, data flow, and reflexio details.
 
 ---

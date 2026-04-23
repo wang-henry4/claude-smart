@@ -72,13 +72,17 @@ _CLEAN_ID_RE = re.compile(r"^(?i:cs:)?((?i:[pr])\d+(?:-(?i:[a-z0-9]){1,4})?)$")
 _SPLIT_RE = re.compile(_ID_SEP)
 
 CITATION_INSTRUCTION = (
-    "_If any item above materially shaped this response, end your reply "
-    "with `cs-cite p1-ab12,r2-cd34` via the Bash tool — pass the full ids "
-    "from the `[cs:xxxx]` tags (e.g. for `[cs:p1-ab12]` and `[cs:r2-cd34]` "
-    "run `cs-cite p1-ab12,r2-cd34`; the `cs:` prefix is stripped "
-    "automatically if you include it). Use `p<N>-<fp>` for profile "
-    "preferences and `r<N>-<fp>` for playbook rules. Ids only, no prose, "
-    "one Bash call. Omit if none applied._"
+    "_If an item above actually shaped this reply — changed what you "
+    "said, did, or how you said it — signal it with `cs-cite <id>` via "
+    "the Bash tool at the end of your reply. Ids come verbatim from the "
+    "`[cs:…]` tags; keep the leading `p` (profile) or `r` (playbook) "
+    "and the `-<fp>` suffix, e.g. `cs-cite r1-ab12`. One id is the "
+    "common shape; list multiple only when each shaped a different part "
+    "of the answer, e.g. `cs-cite r1-ab12,p2-cd34`. Ids only, no prose, "
+    "one Bash call. "
+    "If unsure whether an item influenced you, cite it. If an item is "
+    "merely on-topic but your reply would read the same without it, "
+    "skip the call._"
 )
 
 

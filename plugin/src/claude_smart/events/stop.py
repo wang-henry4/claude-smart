@@ -126,16 +126,30 @@ def _is_user_turn_boundary(entry: dict[str, Any]) -> bool:
 
 
 def _extract_text_blocks(content: Any) -> list[str]:
+    """Return assistant-visible text from a transcript content list.
+
+    Picks up plain ``type: "text"`` blocks and the ``plan`` payload of
+    ``ExitPlanMode`` tool_use blocks. Plan mode emits the plan as a
+    tool_use argument rather than a text block, so without the second
+    branch the plan is silently dropped from the published turn.
+    """
     if isinstance(content, str):
         return [content]
     if not isinstance(content, list):
         return []
     out: list[str] = []
     for block in content:
-        if isinstance(block, dict) and block.get("type") == "text":
+        if not isinstance(block, dict):
+            continue
+        btype = block.get("type")
+        if btype == "text":
             text = block.get("text")
             if isinstance(text, str) and text:
                 out.append(text)
+        elif btype == "tool_use" and block.get("name") == "ExitPlanMode":
+            plan = (block.get("input") or {}).get("plan")
+            if isinstance(plan, str) and plan:
+                out.append(f"Plan:\n{plan}")
     return out
 
 

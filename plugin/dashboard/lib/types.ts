@@ -100,3 +100,17 @@ export interface ClaudeSmartConfig {
   CLAUDE_SMART_STATE_DIR: string;
   [extra: string]: string | boolean;
 }
+
+export interface ReflexioExtractorConfig {
+  extraction_definition_prompt?: string;
+  [k: string]: unknown;
+}
+
+export interface ReflexioConfig {
+  agent_context_prompt?: string | null;
+  batch_size?: number;
+  batch_interval?: number;
+  profile_extractor_configs?: ReflexioExtractorConfig[] | null;
+  user_playbook_extractor_configs?: ReflexioExtractorConfig[] | null;
+  [k: string]: unknown;
+}

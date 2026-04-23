@@ -32,6 +32,8 @@ def handle(payload: dict[str, Any]) -> None:
     )
     playbooks, profiles = adapter.fetch_both(
         project_id=project_id,
+        playbook_top_k=1,
+        profile_top_k=1,
     )
 
     markdown, registry = context_format.render_with_registry(

@@ -17,7 +17,7 @@ from typing import Any
 from claude_smart import context_format, cs_cite, hook, ids, query_compose, state
 from claude_smart.reflexio_adapter import Adapter
 
-_TOP_K = 5
+_TOP_K = 3
 
 
 def handle(payload: dict[str, Any]) -> None:

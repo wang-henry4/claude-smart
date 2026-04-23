@@ -84,6 +84,18 @@ if ! grep -q '^CLAUDE_SMART_USE_LOCAL_EMBEDDING=' "$REFLEXIO_ENV"; then
   echo "[claude-smart] appended CLAUDE_SMART_USE_LOCAL_EMBEDDING=1 to $REFLEXIO_ENV" >&2
 fi
 
+# Migrate stale REFLEXIO_URL from reflexio's library default (8081) to the
+# plugin backend port (8071). Matches the quoted and unquoted forms but
+# requires paired quotes, so malformed or deliberately different values
+# (e.g. a remote reflexio URL) are preserved.
+if grep -qE '^REFLEXIO_URL=("http://localhost:8081/?"|http://localhost:8081/?)$' "$REFLEXIO_ENV"; then
+  sed -i.bak -E \
+    -e 's|^REFLEXIO_URL="http://localhost:8081(/?)"$|REFLEXIO_URL="http://localhost:8071\1"|' \
+    -e 's|^REFLEXIO_URL=http://localhost:8081(/?)$|REFLEXIO_URL=http://localhost:8071\1|' \
+    "$REFLEXIO_ENV"
+  echo "[claude-smart] migrated REFLEXIO_URL 8081 → 8071 in $REFLEXIO_ENV (backup at $REFLEXIO_ENV.bak)" >&2
+fi
+
 if ! command -v claude >/dev/null 2>&1; then
   echo "[claude-smart] WARNING: 'claude' CLI not on PATH — reflexio extractors will have no LLM until it's installed" >&2
 fi
