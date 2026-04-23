@@ -33,6 +33,7 @@ Tunables read by the plugin at runtime. Most users don't need to touch these —
 | `CLAUDE_SMART_BACKEND_AUTOSTART` | `1` | Set to `0` to stop the SessionStart hook from spawning the reflexio backend on `localhost:8071`. |
 | `CLAUDE_SMART_DASHBOARD_AUTOSTART` | `1` | Set to `0` to stop the SessionStart hook from spawning the Next.js dashboard on `localhost:3001`. |
 | `CLAUDE_SMART_BACKEND_STOP_ON_END` | `0` | Set to `1` to tear down the backend at `SessionEnd` instead of leaving it long-lived. |
+| `CLAUDE_SMART_PLUGIN_ROOT_FOLLOW_SESSION` | `0` | Set to `1` (in env or `~/.reflexio/.env`) to have every `SessionStart` relink `~/.reflexio/plugin-root` to the session's active plugin dir. Off by default so a local-dev symlink (force-set by `setup-local-dev.sh`) is preserved when a remote-plugin session fires on the same machine. Turn on if you juggle remote and local-dev across different repos and want slash commands to follow whichever plugin this session loaded. |
 | `REFLEXIO_URL` | `http://localhost:8071/` | Point the plugin at a non-local reflexio backend. |
 
 ## Embeddings

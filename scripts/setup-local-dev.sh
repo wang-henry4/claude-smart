@@ -126,6 +126,17 @@ settings_path.write_text(json.dumps(data, indent=2) + "\n")
 PY
 log "wrote $SETTINGS_FILE (claude-smart@reflexioai-local enabled, @reflexioai shadowed off)"
 
+# Force-point ~/.reflexio/plugin-root at this repo's plugin/ so slash
+# commands resolve to editable in-repo sources (not the marketplace
+# cache). SessionStart's non-force self-heal will respect this link.
+# Warn (don't abort) on failure — marketplace registration and settings
+# have already been committed by this point, so aborting would leave the
+# user in a half-configured state.
+if ! bash "$PLUGIN_ROOT/scripts/ensure-plugin-root.sh" "$PLUGIN_ROOT" --force; then
+  log "WARNING: ensure-plugin-root failed; rerun manually:"
+  log "  bash $PLUGIN_ROOT/scripts/ensure-plugin-root.sh $PLUGIN_ROOT --force"
+fi
+
 log ""
 log "done. Restart Claude Code to pick up the local plugin."
 log "  pyproject.toml → editable reflexio-ai from ../reflexio"

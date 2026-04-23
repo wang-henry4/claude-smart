@@ -174,5 +174,12 @@ if [ -d "$DASHBOARD_DIR" ]; then
   fi
 fi
 
+# Point ~/.reflexio/plugin-root at this install so slash commands can
+# reference one stable short path regardless of which marketplace
+# (reflexioai or reflexioai-local) loaded us.
+if ! bash "$HERE/ensure-plugin-root.sh" "$PLUGIN_ROOT"; then
+  echo "[claude-smart] WARNING: failed to set ~/.reflexio/plugin-root symlink — slash commands may not resolve" >&2
+fi
+
 echo "[claude-smart] install complete. Backend and dashboard auto-start on session start." >&2
 echo '{"continue":true,"suppressOutput":true}'
