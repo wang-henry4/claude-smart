@@ -136,6 +136,7 @@ export async function listSessions(): Promise<SessionSummary[]> {
   const summaries: SessionSummary[] = [];
   for (const entry of entries) {
     if (!entry.endsWith(".jsonl")) continue;
+    if (entry.endsWith(".injected.jsonl")) continue;
     const fullPath = path.join(dir, entry);
     const records = await readJsonl(fullPath).catch(() => []);
     const { turns, publishedUpTo, hasCorrection, lastTs, firstTs, preview } =
