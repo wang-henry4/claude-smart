@@ -14,12 +14,13 @@
 #   - git (for the release flow)
 
 .PHONY: help bump release publish publish-npm publish-pypi publish-dry \
-        check-version check-clean
+        check-version check-clean ensure-remote-reflexio unskip-worktree
 
 VERSION_FILES := package.json plugin/pyproject.toml \
                  plugin/.claude-plugin/plugin.json .claude-plugin/marketplace.json \
                  README.md
 LOCK_FILES    := plugin/uv.lock
+PYPROJECT     := plugin/pyproject.toml
 
 help:
 	@awk 'BEGIN{FS=":.*##"} /^[a-zA-Z_-]+:.*##/{printf "  %-20s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -35,7 +36,23 @@ check-clean:
 	@git diff --quiet && git diff --cached --quiet \
 	  || { echo "error: working tree is dirty — commit or stash first" >&2; exit 1; }
 
-bump: check-version ## Rewrite version in all 4 manifests
+unskip-worktree: ## Clear skip-worktree on plugin/pyproject.toml and plugin/uv.lock so release edits land in git
+	@echo "→ clearing skip-worktree on $(PYPROJECT) $(LOCK_FILES)"
+	@git update-index --no-skip-worktree $(PYPROJECT) $(LOCK_FILES) 2>/dev/null || true
+
+ensure-remote-reflexio: ## Ensure [tool.uv.sources] is commented out so published wheels resolve reflexio-ai from PyPI (see scripts/setup-local-dev.sh to re-enable for dev)
+	@echo "→ ensuring [tool.uv.sources] override is commented out in $(PYPROJECT)"
+	@sed -i.bak -E \
+	    -e 's|^\[tool\.uv\.sources\]$$|# [tool.uv.sources]|' \
+	    -e 's|^reflexio-ai = \{ path = "\.\./reflexio", editable = true \}$$|# reflexio-ai = { path = "../reflexio", editable = true }|' \
+	    $(PYPROJECT)
+	@rm -f $(PYPROJECT).bak
+	@if grep -qE '^\[tool\.uv\.sources\]|^reflexio-ai = \{ path = "\.\./reflexio"' $(PYPROJECT); then \
+	  echo "error: [tool.uv.sources] block in $(PYPROJECT) is still active after sed" >&2; \
+	  exit 1; \
+	fi
+
+bump: check-version unskip-worktree ensure-remote-reflexio ## Rewrite version in all 4 manifests
 	@echo "→ bumping to $(VERSION)"
 	@sed -i.bak -E 's/"version": "[^"]+"/"version": "$(VERSION)"/' \
 	    package.json plugin/.claude-plugin/plugin.json .claude-plugin/marketplace.json
@@ -44,7 +61,7 @@ bump: check-version ## Rewrite version in all 4 manifests
 	@rm -f package.json.bak plugin/pyproject.toml.bak \
 	       plugin/.claude-plugin/plugin.json.bak .claude-plugin/marketplace.json.bak \
 	       README.md.bak
-	@echo "→ refreshing uv lockfile"
+	@echo "→ refreshing uv lockfile (resolves reflexio-ai from PyPI)"
 	@uv lock --project plugin
 	@echo "→ resulting versions:"
 	@grep -HE '("version"|^version)' $(VERSION_FILES)
@@ -53,13 +70,13 @@ publish-npm: ## Publish the current version to npm
 	@echo "→ npm publish"
 	npm publish --access public
 
-publish-pypi: ## Build and publish the current version to PyPI
+publish-pypi: unskip-worktree ensure-remote-reflexio ## Build and publish the current version to PyPI
 	@echo "→ uv build + uv publish"
 	rm -rf plugin/dist/
 	uv build --project plugin
 	uv publish --project plugin plugin/dist/*
 
-publish-dry: ## Show what would be published without uploading
+publish-dry: unskip-worktree ensure-remote-reflexio ## Show what would be published without uploading
 	@echo "→ npm publish --dry-run"
 	@npm publish --dry-run
 	@echo ""
