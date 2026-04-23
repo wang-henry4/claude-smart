@@ -30,10 +30,10 @@ Tunables read by the plugin at runtime. Most users don't need to touch these —
 | `CLAUDE_SMART_CLI_PATH` | `shutil.which("claude")` | Override the path to the `claude` binary. |
 | `CLAUDE_SMART_CLI_TIMEOUT` | `120` | Per-call subprocess timeout (seconds). Raise for slow prompts. |
 | `CLAUDE_SMART_STATE_DIR` | `~/.claude-smart/sessions/` | Where the per-session JSONL buffer lives. |
-| `CLAUDE_SMART_BACKEND_AUTOSTART` | `1` | Set to `0` to stop the SessionStart hook from spawning the reflexio backend on `localhost:8081`. |
+| `CLAUDE_SMART_BACKEND_AUTOSTART` | `1` | Set to `0` to stop the SessionStart hook from spawning the reflexio backend on `localhost:8071`. |
 | `CLAUDE_SMART_DASHBOARD_AUTOSTART` | `1` | Set to `0` to stop the SessionStart hook from spawning the Next.js dashboard on `localhost:3001`. |
 | `CLAUDE_SMART_BACKEND_STOP_ON_END` | `0` | Set to `1` to tear down the backend at `SessionEnd` instead of leaving it long-lived. |
-| `REFLEXIO_URL` | `http://localhost:8081/` | Point the plugin at a non-local reflexio backend. |
+| `REFLEXIO_URL` | `http://localhost:8071/` | Point the plugin at a non-local reflexio backend. |
 
 ## Embeddings
 
@@ -58,7 +58,7 @@ claude-smart has learned:
   `plugin/dashboard/app/api/sessions/route.ts`).
 - **Profiles / Playbooks** — reflexio data fetched via a proxy route
   (`plugin/dashboard/app/api/reflexio/[...path]/route.ts`) that forwards to the URL
-  configured in the top bar; defaults to `http://localhost:8081`.
+  configured in the top bar; defaults to `http://localhost:8071`.
 - **Configure** — reads and writes `~/.reflexio/.env`, but only the known
   claude-smart keys. Unknown keys (API secrets, user additions) are preserved
   on write and never returned to the browser.
@@ -252,8 +252,10 @@ grep -q '^CLAUDE_SMART_USE_LOCAL_EMBEDDING=' ~/.reflexio/.env 2>/dev/null \
 Run from the `plugin/` directory (where `pyproject.toml` and `uv.lock` live) so that `uv run` uses the claude-smart venv — which already has `chromadb` installed for the local embedder and `reflexio-ai` available with the `reflexio` CLI script registered:
 
 ```bash
-cd plugin && uv run reflexio services start --only backend --no-reload
+cd plugin && BACKEND_PORT=8071 uv run reflexio services start --only backend --no-reload
 ```
+
+`BACKEND_PORT=8071` matches the port the plugin's `SessionStart` hook uses (reflexio's library default is 8081 — we override to keep the plugin's backend off that well-known port).
 
 Expected log lines:
 
@@ -266,11 +268,11 @@ Embedding provider: local
 Application startup complete.
 ```
 
-Health check: `curl http://localhost:8081/health` → `{"status":"healthy"}`. Stop with `uv run reflexio services stop`.
+Health check: `curl http://localhost:8071/health` → `{"status":"healthy"}`. Stop with `uv run reflexio services stop`.
 
 ### Step 5 — Pick an install mode: local working copy vs. remote marketplace
 
-`claude-smart` can be loaded two ways, and you can only have **one enabled at a time**. Claude Code merges `enabledPlugins` across user + project scopes, so enabling both spawns duplicate slash commands, duplicate SessionStart hooks, and a race on ports 8081 / 3001.
+`claude-smart` can be loaded two ways, and you can only have **one enabled at a time**. Claude Code merges `enabledPlugins` across user + project scopes, so enabling both spawns duplicate slash commands, duplicate SessionStart hooks, and a race on ports 8071 / 3001.
 
 | Mode | `enabledPlugins` key | Source | Use when |
 | --- | --- | --- | --- |
@@ -304,7 +306,7 @@ The `"claude-smart@reflexioai": false` line explicitly overrides whatever is in 
 
 Restart Claude Code. Changes to `plugin/` are picked up on the next session; changes to `plugin/src/claude_smart/` are picked up on the next hook invocation (hooks shell out via `uv run`, so editing the Python package takes effect immediately without a restart).
 
-Edits to the `reflexio/` submodule or `plugin/dashboard/` source are **not** picked up automatically — the SessionStart hook leaves the backend (port 8081) and the dashboard's `npm run start` against prebuilt `.next/` (port 3001) long-lived across sessions. Use the built-in restart command:
+Edits to the `reflexio/` submodule or `plugin/dashboard/` source are **not** picked up automatically — the SessionStart hook leaves the backend (port 8071) and the dashboard's `npm run start` against prebuilt `.next/` (port 3001) long-lived across sessions. Use the built-in restart command:
 
 ```
 /claude-smart:restart          # inside Claude Code

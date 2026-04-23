@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Auto-start the reflexio FastAPI backend (port 8081) if it's not already
+# Auto-start the reflexio FastAPI backend (port 8071) if it's not already
 # running. Mirrors dashboard-service.sh: detached spawn, returns immediately
 # so the SessionStart hook doesn't block the session.
 #
@@ -23,7 +23,10 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 claude_smart_source_login_path
 
 CMD="${1:-start}"
-PORT=8081
+PORT=8071
+# Pass through to `reflexio services start/stop` so the spawned backend
+# binds to PORT instead of reflexio's library default (8081).
+export BACKEND_PORT="$PORT"
 
 PLUGIN_ROOT="$(cd "$HERE/.." && pwd)"
 
@@ -49,7 +52,7 @@ kill_group() {
 
 # True if /health returns 200. Reflexio's /health is a plain GET with no
 # marker header, so we can't distinguish our backend from someone else's
-# reflexio on the same port — if you run two reflexio instances on 8081
+# reflexio on the same port — if you run two reflexio instances on 8071
 # you'll get collision regardless of what we do here.
 backend_healthy() {
   command -v curl >/dev/null 2>&1 || return 1

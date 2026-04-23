@@ -171,7 +171,7 @@ benchmarks/memory_comparison/
 
 Both plugins must be installed and running. The harness expects:
 
-- reflexio backend reachable at `http://localhost:8081/` (claude-smart's `SessionStart` hook starts it automatically)
+- reflexio backend reachable at `http://localhost:8071/` (claude-smart's `SessionStart` hook starts it automatically)
 - claude-mem worker healthy at `http://localhost:37xxx/health` (its `SessionStart` hook starts it automatically)
 - `claude` CLI on PATH and logged in (for the judge)
 

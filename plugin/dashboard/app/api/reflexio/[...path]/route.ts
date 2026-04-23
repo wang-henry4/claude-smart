@@ -3,7 +3,7 @@ import { originOnly } from "@/lib/reflexio-url";
 
 export const dynamic = "force-dynamic";
 
-const DEFAULT_URL = "http://localhost:8081";
+const DEFAULT_URL = "http://localhost:8071";
 
 function reflexioBase(req: Request): string {
   const header = req.headers.get("x-reflexio-url");

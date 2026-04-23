@@ -15,7 +15,7 @@ from typing import Any, Sequence
 _LOGGER = logging.getLogger(__name__)
 
 _ENV_URL = "REFLEXIO_URL"
-_DEFAULT_URL = "http://localhost:8081/"
+_DEFAULT_URL = "http://localhost:8071/"
 _SEARCH_MODE_HYBRID = "hybrid"  # reflexio.models.config_schema.SearchMode.HYBRID
 
 

@@ -46,7 +46,7 @@ function parseLine(line: string): { key: string; value: string } | null {
 
 export async function readConfig(): Promise<ClaudeSmartConfig> {
   const defaults: ClaudeSmartConfig = {
-    REFLEXIO_URL: "http://localhost:8081/",
+    REFLEXIO_URL: "http://localhost:8071/",
     CLAUDE_SMART_USE_LOCAL_CLI: false,
     CLAUDE_SMART_USE_LOCAL_EMBEDDING: false,
     CLAUDE_SMART_CLI_PATH: "",

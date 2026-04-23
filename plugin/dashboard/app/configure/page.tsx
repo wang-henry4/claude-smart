@@ -93,7 +93,7 @@ export default function ConfigurePage() {
               value={reflexioUrl}
               onChange={(e) => setReflexioUrl(e.target.value)}
               className="font-mono text-xs"
-              placeholder="http://localhost:8081"
+              placeholder="http://localhost:8071"
             />
           </div>
         </section>
@@ -119,7 +119,7 @@ export default function ConfigurePage() {
                   value={config.REFLEXIO_URL}
                   onChange={(e) => update("REFLEXIO_URL", e.target.value)}
                   className="font-mono text-xs"
-                  placeholder="http://localhost:8081/"
+                  placeholder="http://localhost:8071/"
                 />
               </div>
 

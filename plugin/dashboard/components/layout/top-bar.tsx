@@ -45,7 +45,7 @@ export function TopBar() {
         <Input
           value={reflexioUrl}
           onChange={(e) => setReflexioUrl(e.target.value)}
-          placeholder="http://localhost:8081"
+          placeholder="http://localhost:8071"
           className="h-8 text-xs max-w-xs font-mono"
         />
       </div>

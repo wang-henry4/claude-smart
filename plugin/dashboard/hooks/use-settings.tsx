@@ -20,7 +20,7 @@ interface SettingsContextValue extends Settings {
 const SettingsContext = createContext<SettingsContextValue | null>(null);
 
 const STORAGE_KEY = "claude-smart-dashboard-settings";
-const DEFAULT_URL = "http://localhost:8081";
+const DEFAULT_URL = "http://localhost:8071";
 const DEFAULTS: Settings = { reflexioUrl: DEFAULT_URL };
 const DEFAULT_JSON = JSON.stringify(DEFAULTS);
 
