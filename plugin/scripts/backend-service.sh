@@ -28,6 +28,23 @@ PORT=8071
 # binds to PORT instead of reflexio's library default (8081).
 export BACKEND_PORT="$PORT"
 
+# Default: route extraction through the local claude CLI + ONNX embedder
+# so claude-smart works without any LLM API key. Users can opt out by
+# pre-exporting these to 0.
+export CLAUDE_SMART_USE_LOCAL_CLI="${CLAUDE_SMART_USE_LOCAL_CLI:-1}"
+export CLAUDE_SMART_USE_LOCAL_EMBEDDING="${CLAUDE_SMART_USE_LOCAL_EMBEDDING:-1}"
+# The backend can be spawned from contexts whose PATH lacks the claude
+# CLI dir (commonly ~/.local/bin or /opt/homebrew/bin). Pin the CLI
+# explicitly if we can resolve it from our own (post-login-path) PATH.
+if [ -z "${CLAUDE_SMART_CLI_PATH:-}" ]; then
+  if _cs_claude_path=$(command -v claude 2>/dev/null) && [ -n "$_cs_claude_path" ]; then
+    export CLAUDE_SMART_CLI_PATH="$_cs_claude_path"
+  elif [ -x "$HOME/.local/bin/claude" ]; then
+    export CLAUDE_SMART_CLI_PATH="$HOME/.local/bin/claude"
+  fi
+  unset _cs_claude_path
+fi
+
 PLUGIN_ROOT="$(cd "$HERE/.." && pwd)"
 
 STATE_DIR="$HOME/.claude-smart"
@@ -79,6 +96,46 @@ is_our_backend_running() {
 # avoid stomping on a foreign listener with a failed-to-start uvicorn.
 port_occupied() {
   (echo >"/dev/tcp/127.0.0.1/$PORT") 2>/dev/null
+}
+
+# Reap any reflexio/uvicorn listener still holding $PORT after the PID
+# file kill. Filters by cmdline so we don't knock over an unrelated
+# service a user has bound to 8071 — symmetric with start's refusal to
+# stomp on a foreign listener. Silent on failure.
+reap_port_listeners() {
+  command -v lsof >/dev/null 2>&1 || return 0
+  candidates=$(lsof -ti:"$PORT" 2>/dev/null) || candidates=""
+  [ -z "$candidates" ] && return 0
+  ours=""
+  for pid in $candidates; do
+    cmdline=$(ps -p "$pid" -o command= 2>/dev/null || true)
+    case "$cmdline" in
+      *reflexio*|*uvicorn*) ours="$ours $pid" ;;
+    esac
+  done
+  [ -z "$ours" ] && return 0
+  # shellcheck disable=SC2086
+  kill -TERM $ours 2>/dev/null || true
+  sleep 1
+  remaining=""
+  for pid in $ours; do
+    kill -0 "$pid" 2>/dev/null && remaining="$remaining $pid"
+  done
+  [ -z "$remaining" ] && return 0
+  # shellcheck disable=SC2086
+  kill -KILL $remaining 2>/dev/null || true
+}
+
+# Full shutdown: kill the recorded process group (if any) then sweep the
+# port for surviving reflexio listeners. Used by both `stop` and the
+# opt-in `session-end` path so a stale/missing PID file doesn't produce
+# a silent no-op.
+full_stop() {
+  if [ -f "$PID_FILE" ]; then
+    kill_group "$(cat "$PID_FILE" 2>/dev/null)"
+    rm -f "$PID_FILE"
+  fi
+  reap_port_listeners
 }
 
 case "$CMD" in
@@ -145,10 +202,7 @@ case "$CMD" in
     emit_ok
     ;;
   stop)
-    if [ -f "$PID_FILE" ]; then
-      kill_group "$(cat "$PID_FILE" 2>/dev/null)"
-      rm -f "$PID_FILE"
-    fi
+    full_stop
     emit_ok
     ;;
   session-end)
@@ -156,10 +210,7 @@ case "$CMD" in
     # between sessions. Opt in to teardown with
     # CLAUDE_SMART_BACKEND_STOP_ON_END=1.
     if [ "${CLAUDE_SMART_BACKEND_STOP_ON_END:-0}" = "1" ]; then
-      if [ -f "$PID_FILE" ]; then
-        kill_group "$(cat "$PID_FILE" 2>/dev/null)"
-        rm -f "$PID_FILE"
-      fi
+      full_stop
     fi
     emit_ok
     ;;

@@ -434,7 +434,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "chromadb", specifier = ">=0.5" },
-    { name = "reflexio-ai" },
+    { name = "reflexio-ai", specifier = ">=0.2.15" },
 ]
 
 [package.metadata.requires-dev]
@@ -2371,7 +2371,7 @@ wheels = [
 
 [[package]]
 name = "reflexio-ai"
-version = "0.2.13"
+version = "0.2.15"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiohttp" },
@@ -2379,6 +2379,7 @@ dependencies = [
     { name = "bcrypt" },
     { name = "braintrust" },
     { name = "cachetools" },
+    { name = "chromadb" },
     { name = "colorlog" },
     { name = "duckduckgo-search" },
     { name = "fastapi" },
@@ -2404,9 +2405,9 @@ dependencies = [
     { name = "websocket-client" },
     { name = "xlsxwriter" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/89/1c/d2163ee0a507613d3fb789a02f80b4e32d867658d0e9e59c6ce937a3dcb8/reflexio_ai-0.2.13.tar.gz", hash = "sha256:3d9b11abf1611f4bc007b5ffd5f2fa49edad1186abf101d5c2c92474c52d0d2b", size = 445554, upload-time = "2026-04-16T18:20:09.295Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/31/16/cd3bdee0f266cd730ec69f73b2f56c48265b2e93af3253ebaaf2fa0d7462/reflexio_ai-0.2.15.tar.gz", hash = "sha256:522aca1c8028f9490eba20e085ccb44576c90af08b33610c5e4c79af0a858d4b", size = 536144, upload-time = "2026-04-23T17:01:44.26Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/1c/c9/bea0bdc14538ef445a63149e2e3d07d478ffc20a6598b9bba8a06ea97da0/reflexio_ai-0.2.13-py3-none-any.whl", hash = "sha256:63b1f6a07aabd35efecc9a931daa70b750880663e0bb9783d65111beb1ff127d", size = 595944, upload-time = "2026-04-16T18:20:07.703Z" },
+    { url = "https://files.pythonhosted.org/packages/72/85/6be36abde2ed51eeba10efd05709726c8c0b76b05b956310f7c20c56c47e/reflexio_ai-0.2.15-py3-none-any.whl", hash = "sha256:1741c9599cbbb424ffe68f27f3e604aedfb23e7a94a361f16c28f07fd319c229", size = 723455, upload-time = "2026-04-23T17:01:45.779Z" },
 ]
 
 [[package]]
