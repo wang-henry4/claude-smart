@@ -72,17 +72,21 @@ _CLEAN_ID_RE = re.compile(r"^(?i:cs:)?((?i:[pr])\d+(?:-(?i:[a-z0-9]){1,4})?)$")
 _SPLIT_RE = re.compile(_ID_SEP)
 
 CITATION_INSTRUCTION = (
-    "_If an item above actually shaped this reply — changed what you "
-    "said, did, or how you said it — signal it with `cs-cite <id>` via "
-    "the Bash tool at the end of your reply. Ids come verbatim from the "
-    "`[cs:…]` tags; keep the leading `p` (profile) or `r` (playbook) "
-    "and the `-<fp>` suffix, e.g. `cs-cite r1-ab12`. One id is the "
-    "common shape; list multiple only when each shaped a different part "
-    "of the answer, e.g. `cs-cite r1-ab12,p2-cd34`. Ids only, no prose, "
-    "one Bash call. "
-    "If unsure whether an item influenced you, cite it. If an item is "
-    "merely on-topic but your reply would read the same without it, "
-    "skip the call._"
+    "_If — and only if — an item above materially changed this reply "
+    "(different wording, different action, different conclusion than you "
+    "would have produced without it), signal it with `cs-cite <id>` via "
+    "the Bash tool as the final action of your turn. Ids come verbatim "
+    "from the `[cs:…]` tags; keep the leading `p` (profile) or `r` "
+    "(playbook) and the `-<fp>` suffix, e.g. `cs-cite r1-ab12`. One id "
+    "is the common shape; list multiple only when each shaped a different "
+    "part of the answer, e.g. `cs-cite r1-ab12,p2-cd34`. Ids only, no "
+    "prose, one Bash call. "
+    "Default is to skip: if an item is merely on-topic, confirms what you "
+    "already planned, or your reply would read the same without it, do "
+    "not cite. When unsure, skip. "
+    "The `cs-cite` call ends the turn. Do not output any text after it — "
+    "no acknowledgement, no summary, no 'no further action needed'. The "
+    "tool's own output is the entire signal._"
 )
 
 
