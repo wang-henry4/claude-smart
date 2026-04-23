@@ -5,4 +5,4 @@ allowed-tools: Bash(bash:*)
 
 Run this bash command and show its output verbatim:
 
-!`bash "$CLAUDE_PLUGIN_ROOT/scripts/dashboard-open.sh"`
+!`bash "$HOME/.claude/plugins/marketplaces/reflexioai/plugin/scripts/dashboard-open.sh"`

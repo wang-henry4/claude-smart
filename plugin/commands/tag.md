@@ -7,4 +7,4 @@ argument-hint: [note]
 Tag the user's previous turn as a correction for reflexio to learn from.
 Run the bash command below and show its output verbatim.
 
-!`uv run --project "$CLAUDE_PLUGIN_ROOT" --quiet python -m claude_smart.cli tag "$ARGUMENTS"`
+!`uv run --project "$HOME/.claude/plugins/marketplaces/reflexioai/plugin" --quiet python -m claude_smart.cli tag "$ARGUMENTS"`
