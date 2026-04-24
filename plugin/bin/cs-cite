@@ -2,11 +2,13 @@
 """cs-cite — claude-smart citation tool.
 
 Claude invokes this via Bash at the end of a reply when an injected
-playbook or profile materially shaped the response. The script's only
-job is to print a tasteful TUI confirmation line. The citation IDs
-themselves are read off the Bash ``tool_use`` block by claude-smart's
-Stop hook when it scans the session transcript — no session_id, no
-sidecar file, no state.
+playbook or profile materially shaped the response. The script silently
+validates the id tokens and exits; the Stop hook reads the citation IDs
+off the Bash ``tool_use`` block when it scans the session transcript —
+no session_id, no sidecar file, no state. The confirmation line
+("✨ N claude-smart learnings applied") is emitted by Claude itself as
+the trailing content of the same assistant message, not by this script,
+so the model has a natural, bounded turn-closer after the tool returns.
 
 Usage:
     cs-cite <id> [<id>...]            # space- or comma-separated
@@ -18,12 +20,6 @@ alphanumeric fingerprint of the underlying real id. Tokens may be
 separated by commas and/or whitespace. An optional ``cs:`` prefix is
 stripped for convenience since the model often copies the tag
 verbatim. Case is normalized to lowercase.
-
-Examples:
-    cs-cite p1-ab12                 -> ✨ 1 claude-smart learning applied
-    cs-cite p1-ab12,r2-cd34         -> ✨ 2 claude-smart learnings applied
-    cs-cite cs:p1-ab12,cs:r2-cd34   -> ✨ 2 claude-smart learnings applied
-    cs-cite p1-ab12 r2-cd34         -> ✨ 2 claude-smart learnings applied
 """
 
 from __future__ import annotations
@@ -40,7 +36,13 @@ _USAGE = (
 
 
 def main() -> int:
-    """Parse ids from argv and print the TUI confirmation line.
+    """Parse ids from argv and exit silently on success.
+
+    The confirmation line is emitted by Claude as the trailing content of
+    the same assistant message (see ``CITATION_INSTRUCTION``), not here —
+    keeping this script silent gives the model a natural, bounded thing
+    to say after the tool returns instead of leaving a "must emit
+    something" gap that tends to hallucinate role markers.
 
     Returns:
         int: ``0`` on success, ``1`` when no valid ids were found.
@@ -68,9 +70,6 @@ def main() -> int:
     if not ids:
         sys.stderr.write(_USAGE)
         return 1
-    n = len(ids)
-    suffix = "" if n == 1 else "s"
-    sys.stdout.write(f"✨ {n} claude-smart learning{suffix} applied\n")
     return 0
 
 

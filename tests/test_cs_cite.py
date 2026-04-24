@@ -188,16 +188,22 @@ def _run_cs_cite(*argv: str) -> subprocess.CompletedProcess[str]:
     )
 
 
-def test_cs_cite_script_prints_singular_line() -> None:
+def test_cs_cite_script_is_silent_on_success() -> None:
+    """The script no longer prints the confirmation line; the model does.
+
+    This gives Claude a natural trailing thing to emit after the Bash call,
+    which fixes a role-marker hallucination bug caused by framing cs-cite
+    as a turn-terminator when it is actually a regular tool call.
+    """
     r = _run_cs_cite("p1-ab12")
     assert r.returncode == 0
-    assert r.stdout == "✨ 1 claude-smart learning applied\n"
+    assert r.stdout == ""
 
 
-def test_cs_cite_script_prints_plural_line() -> None:
+def test_cs_cite_script_silent_for_multiple_ids() -> None:
     r = _run_cs_cite("p1-ab12,r2-cd34,p3-ef56")
     assert r.returncode == 0
-    assert r.stdout == "✨ 3 claude-smart learnings applied\n"
+    assert r.stdout == ""
 
 
 def test_cs_cite_script_rejects_no_args() -> None:
@@ -210,20 +216,20 @@ def test_cs_cite_script_accepts_space_separated_argv() -> None:
     """Multiple argv tokens are joined; Stop-side regex tolerates the shape."""
     r = _run_cs_cite("p1-ab12", "r2-cd34")
     assert r.returncode == 0
-    assert r.stdout == "✨ 2 claude-smart learnings applied\n"
+    assert r.stdout == ""
 
 
 def test_cs_cite_script_strips_cs_prefix() -> None:
     """Ids copied verbatim from `[cs:xxxx]` tags are accepted."""
     r = _run_cs_cite("cs:p1-ab12,cs:r2-cd34,cs:p3-ef56")
     assert r.returncode == 0
-    assert r.stdout == "✨ 3 claude-smart learnings applied\n"
+    assert r.stdout == ""
 
 
 def test_cs_cite_script_normalizes_uppercase() -> None:
     r = _run_cs_cite("P1-AB12,R2-CD34")
     assert r.returncode == 0
-    assert r.stdout == "✨ 2 claude-smart learnings applied\n"
+    assert r.stdout == ""
 
 
 def test_cs_cite_script_accepts_bare_rank_without_fingerprint() -> None:
@@ -231,7 +237,7 @@ def test_cs_cite_script_accepts_bare_rank_without_fingerprint() -> None:
     that had no real id."""
     r = _run_cs_cite("p1,r2")
     assert r.returncode == 0
-    assert r.stdout == "✨ 2 claude-smart learnings applied\n"
+    assert r.stdout == ""
 
 
 def test_cs_cite_script_rejects_malformed_ids() -> None:
@@ -241,8 +247,8 @@ def test_cs_cite_script_rejects_malformed_ids() -> None:
 
 
 def test_cs_cite_script_warns_on_mixed_valid_and_invalid() -> None:
-    """Valid ids still succeed; invalid tokens are flagged on stderr."""
+    """Valid ids still succeed (silently); invalid tokens are flagged on stderr."""
     r = _run_cs_cite("p1-ab12,notarank,r3-cd34")
     assert r.returncode == 0
-    assert r.stdout == "✨ 2 claude-smart learnings applied\n"
+    assert r.stdout == ""
     assert "notarank" in r.stderr

@@ -211,6 +211,37 @@ def test_read_injected_drops_entries_without_id(session_dir) -> None:
     assert set(registry.keys()) == {"r1-ab12"}
 
 
+def test_unpublished_slice_truncates_overlong_tool_fields_to_cap() -> None:
+    """Top-level string fields over the cap are truncated; the result still
+    round-trips through ``json.dumps`` so publish never sends invalid JSON.
+    """
+    long_cmd = "x" * 5000
+    long_edit = "y" * 5000
+    records = [
+        {"role": "User", "content": "u1"},
+        {
+            "role": "Assistant_tool",
+            "tool_name": "Bash",
+            "tool_input": {"command": long_cmd, "description": "short"},
+            "status": "success",
+        },
+        {
+            "role": "Assistant_tool",
+            "tool_name": "Edit",
+            "tool_input": {"file_path": "/a/b.py", "new_string": long_edit},
+            "status": "success",
+        },
+        {"role": "Assistant", "content": "a1"},
+    ]
+    _, turns = state.unpublished_slice(records)
+    tools = turns[-1]["tools_used"]
+    assert len(tools[0]["tool_data"]["input"]["command"]) == state._TOOL_DATA_FIELD_MAX_LEN
+    assert tools[0]["tool_data"]["input"]["description"] == "short"
+    assert len(tools[1]["tool_data"]["input"]["new_string"]) == state._TOOL_DATA_FIELD_MAX_LEN
+    assert tools[1]["tool_data"]["input"]["file_path"] == "/a/b.py"
+    json.dumps(turns[-1])  # sanity: publish-ready
+
+
 def test_unpublished_slice_strips_cited_items(session_dir) -> None:
     """``cited_items`` is dashboard-only metadata; reflexio must not receive it."""
     records = [

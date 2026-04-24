@@ -74,7 +74,7 @@ def render_with_registry(
 
     sections: list[str] = [f"## claude-smart — project `{project_id}`"]
     if playbook_lines:
-        sections.append("### Project playbook")
+        sections.append("### Playbook")
         sections.extend(playbook_lines)
     if profile_lines:
         sections.append("### Project preferences")

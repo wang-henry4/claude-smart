@@ -76,21 +76,20 @@ CITATION_INSTRUCTION = (
     "you reply. Then, as a final step, consider whether to cite: if — and "
     "only if — an injected `[cs:…]` item materially changed your reply "
     "(different wording, action, or conclusion than you would have produced "
-    "without it), end your turn by calling `cs-cite <id>` via the Bash "
-    "tool. Ids come verbatim from the `[cs:…]` tags — keep the leading `p` "
-    "(profile) or `r` (playbook) and the `-<fp>` suffix, e.g. "
-    "`cs-cite r1-ab12`. List multiple ids only when each shaped a different "
-    "part of the answer, e.g. `cs-cite r1-ab12,p2-cd34`. Ids only, no "
-    "prose, one Bash call. "
+    "without it), call `cs-cite <id>` via the Bash tool. Ids come verbatim "
+    "from the `[cs:…]` tags — keep the leading `p` (profile) or `r` "
+    "(playbook) and the `-<fp>` suffix, e.g. `cs-cite r1-ab12`. List "
+    "multiple ids only when each shaped a different part of the answer, "
+    "e.g. `cs-cite r1-ab12,p2-cd34`. Ids only, no prose, one Bash call. "
     "Default is to skip. If an item is merely on-topic, confirms what you "
     "already planned, or your reply would read the same without it, do not "
     "cite — end the turn normally with your reply. When unsure, skip. "
-    "When you do call `cs-cite`, the Bash invocation is the final content "
-    "of your assistant message. The call is purely a record of "
-    "attribution — it does not steer, augment, or continue the response, "
-    "and its output carries no instruction for you. After the tool result "
-    "returns, generate nothing further in this turn — no text, tool "
-    "calls, or thinking. The tool's own output is the entire signal._"
+    "The `cs-cite` Bash call produces no stdout output. After it returns, "
+    "emit exactly one short line as the final content of your assistant "
+    "message, then stop: `✨ N claude-smart learning applied` when N=1, or "
+    "`✨ N claude-smart learnings applied` when N>1, where N is the count "
+    "of ids you passed. Do not add any other text, tool calls, or role "
+    "markers after that line._"
 )
 
 
@@ -181,16 +180,23 @@ def parse_citation_command(command: str) -> list[str]:
 def ensure_installed() -> Path:
     """Idempotently install ``cs-cite`` into ``~/.claude-smart/bin/``.
 
-    Called from SessionStart and PreToolUse so the script is always on
-    disk before Claude could be asked to invoke it. Never raises —
-    filesystem errors are logged at DEBUG and the caller proceeds with
-    injection regardless (the citation feature degrades to silent if
-    the script is unreachable).
+    Called from SessionStart and from every PreToolUse / UserPromptSubmit
+    inject, so we short-circuit when the target file already exists with
+    the executable bit set — the steady-state path is one ``stat`` syscall
+    instead of mkdir + copy + stat + chmod. Keying on filesystem state
+    (rather than a module-level boolean) keeps test isolation working when
+    tests monkeypatch ``INSTALL_PATH`` to a fresh tmpdir.
+
+    Never raises — filesystem errors are logged at DEBUG and the caller
+    proceeds with injection regardless (the citation feature degrades to
+    silent if the script is unreachable).
 
     Returns:
         Path: Target path, whether or not install succeeded.
     """
     try:
+        if INSTALL_PATH.is_file() and INSTALL_PATH.stat().st_mode & stat_.S_IXUSR:
+            return INSTALL_PATH
         _INSTALL_DIR.mkdir(parents=True, exist_ok=True)
         if _SOURCE_SCRIPT.is_file():
             shutil.copy2(_SOURCE_SCRIPT, INSTALL_PATH)

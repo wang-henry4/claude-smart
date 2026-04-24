@@ -32,7 +32,7 @@ _LOGGER = logging.getLogger(__name__)
 _ENV_STATE_DIR = "CLAUDE_SMART_STATE_DIR"
 _DEFAULT_STATE_DIR = Path.home() / ".claude-smart" / "sessions"
 
-_TOOL_DATA_FIELD_MAX_LEN = 2048
+_TOOL_DATA_FIELD_MAX_LEN = 256
 
 
 def _truncate_tool_data_field(value: Any) -> Any:
@@ -43,9 +43,13 @@ def _truncate_tool_data_field(value: Any) -> Any:
     the container holds overlong strings — extractor prompts built from
     this payload are bounded upstream by reflexio, and truncating a mid-
     structure string risks producing invalid JSON when the caller later
-    serializes. The cap is intentionally generous (2048) so real `Bash`
-    commands, file paths, and `WebFetch` URLs survive intact; clipping
-    those mid-token actively degrades learning quality.
+    serializes. The cap keeps long fields (``Edit.old_string`` /
+    ``new_string`` diffs, multi-line ``Bash`` scripts) from inflating the
+    extractor's input; short fields like file paths, URLs, and typical
+    commands stay intact. The value is tuned for extractor-prompt budget
+    predictability, not for preserving every character of a real
+    command — fields over the cap are treated as diff-style content
+    whose exact tail rarely changes what extraction learns.
 
     Args:
         value (Any): A field value from the redacted tool_input dict.

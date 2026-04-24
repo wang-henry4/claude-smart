@@ -13,7 +13,7 @@ Internal notes for maintainers of `claude-smart`. End-user install instructions 
 | `tests/` | Pytest suite for the Python package (run via `uv run --project plugin pytest tests/ -q` from repo root) |
 | `bin/claude-smart.js` | Node wrapper so `npx claude-smart install` works |
 | `package.json` | npm manifest — only ships `bin/`, `README.md`, `LICENSE` |
-| `.claude-plugin/plugin.json` | Plugin metadata read by Claude Code |
+| `plugin/.claude-plugin/plugin.json` | Plugin metadata read by Claude Code |
 | `.claude-plugin/marketplace.json` | Marketplace entry — `claude plugin marketplace add` reads this |
 | `reflexio/` | Submodule — Apache 2.0, storage + search + extraction backend |
 | `plugin/dashboard/` | Next.js management UI for interactions, profiles, playbooks, configuration |
@@ -28,7 +28,6 @@ Tunables read by the plugin at runtime. Most users don't need to touch these —
 | `CLAUDE_SMART_USE_LOCAL_CLI` | `0` (installer sets `1`) | Route generation through the local `claude` CLI. Written to `~/.reflexio/.env` by `claude-smart install`. |
 | `CLAUDE_SMART_USE_LOCAL_EMBEDDING` | `0` (installer sets `1`) | Use the in-process ONNX embedder (requires `chromadb`). Written to `~/.reflexio/.env` by `claude-smart install`. |
 | `CLAUDE_SMART_CLI_PATH` | `shutil.which("claude")` | Override the path to the `claude` binary. |
-| `CLAUDE_SMART_CLI_TIMEOUT` | `120` | Per-call subprocess timeout (seconds). Raise for slow prompts. |
 | `CLAUDE_SMART_STATE_DIR` | `~/.claude-smart/sessions/` | Where the per-session JSONL buffer lives. |
 | `CLAUDE_SMART_BACKEND_AUTOSTART` | `1` | Set to `0` to stop the SessionStart hook from spawning the reflexio backend on `localhost:8071`. |
 | `CLAUDE_SMART_DASHBOARD_AUTOSTART` | `1` | Set to `0` to stop the SessionStart hook from spawning the Next.js dashboard on `localhost:3001`. |
@@ -44,10 +43,10 @@ If you still want to use a cloud embedding provider (OpenAI, Gemini, etc.), omit
 
 ## Scope: profile vs. playbook
 
-Both profiles and playbooks are project-scoped (since the 88cb150 refactor), identified by the git-toplevel basename of the working directory. What differs is the extractor channel and the shape of the record:
+Profiles and playbooks have different scopes:
 
-- **Profile** (reflexio's `user_id = project_id`) — personal preferences ("prefers anyio over asyncio"). Free-form bullets.
-- **Playbook** (reflexio's `agent_version = project_id`) — project-specific rules with trigger and rationale ("when writing a script, use pathlib — os.path is error-prone").
+- **Profile** (reflexio's `user_id = project_id`) — project-scoped personal preferences ("prefers anyio over asyncio"). Free-form bullets.
+- **Playbook** (reflexio's `agent_version = project_id` on *write*; no filter on *read*) — rules with trigger and rationale ("when writing a script, use pathlib — os.path is error-prone"). Writes tag each rule by project for provenance, but `fetch_playbooks` / `search_playbooks` in `plugin/src/claude_smart/reflexio_adapter.py` drop the `agent_version` filter on retrieval, so lessons learned in one project surface in every other project on the same machine.
 
 ## Dashboard
 
@@ -88,7 +87,7 @@ dynamic-param types, consult `plugin/dashboard/node_modules/next/dist/docs/`.
 | --- | --- |
 | `package.json` | `.version` |
 | `plugin/pyproject.toml` | `project.version` |
-| `.claude-plugin/plugin.json` | `.version` |
+| `plugin/.claude-plugin/plugin.json` | `.version` |
 | `.claude-plugin/marketplace.json` | `.plugins[0].version` |
 
 Don't edit these by hand — use `make bump`.

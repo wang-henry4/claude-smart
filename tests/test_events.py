@@ -89,170 +89,28 @@ def test_post_tool_redacts_secret_assignments(session_dir) -> None:
     assert "LOG_LEVEL=INFO" in command
 
 
-def test_post_tool_exit_plan_mode_synthesizes_user_on_approval(
-    session_dir, monkeypatch
-) -> None:
-    """Plan approval comes back as a tool_result — post_tool must mint a User turn."""
-    monkeypatch.setattr(
-        "claude_smart.events.post_tool.ids.resolve_project_id",
-        lambda cwd=None: "demo",
-    )
+def test_post_tool_exit_plan_mode_records_only_assistant_tool(session_dir) -> None:
+    """ExitPlanMode PostToolUse fires *before* the user approves/rejects, so
+    its ``tool_response`` carries the plan payload itself (no decision). The
+    hook therefore writes a plain ``Assistant_tool`` record and nothing else —
+    plan-decision synthesis happens later in the Stop hook from the transcript.
+    """
     post_tool.handle(
         {
             "session_id": "s1",
             "tool_name": "ExitPlanMode",
-            "tool_input": {"plan": "# Plan\n\nbody"},
+            "tool_input": {},
             "tool_response": {
-                "content": (
-                    "Your plan has been saved to: /tmp/plan.md\n"
-                    "User has approved your plan. You can now start coding."
-                )
+                "plan": "# Plan\n\nbody",
+                "isAgent": False,
+                "filePath": "/tmp/plan.md",
+                "hasTaskTool": True,
             },
-            "cwd": "/some/repo",
-        }
-    )
-    records = state.read_all("s1")
-    assert [r["role"] for r in records] == ["Assistant_tool", "User"]
-    assert records[-1]["content"] == "Approved the plan."
-    assert records[-1]["user_id"] == "demo"
-
-
-def test_post_tool_exit_plan_mode_synthesizes_user_on_rejection_with_comment(
-    session_dir, monkeypatch
-) -> None:
-    """Rejection-with-followup: the user's comment is the correction signal.
-
-    Claude Code stuffs the comment into the ExitPlanMode tool_result after
-    ``the user said:`` — no UserPromptSubmit fires — so we extract it and
-    put it in the synthesized User record's content.
-    """
-    monkeypatch.setattr(
-        "claude_smart.events.post_tool.ids.resolve_project_id",
-        lambda cwd=None: "demo",
-    )
-    rejection = (
-        "The user doesn't want to proceed with this tool use. "
-        "The tool use was rejected (eg. if it was a file edit, the new_string "
-        "was NOT written to the file). To tell you how to proceed, the user said:\n"
-        "avoid making the prompt too long, use version v4.0.1 as this is a small change"
-    )
-    post_tool.handle(
-        {
-            "session_id": "s1",
-            "tool_name": "ExitPlanMode",
-            "tool_input": {"plan": "# Plan"},
-            "tool_response": rejection,
-            "cwd": "/some/repo",
-        }
-    )
-    records = state.read_all("s1")
-    assert [r["role"] for r in records] == ["Assistant_tool", "User"]
-    assert records[-1]["content"] == (
-        "Rejected the plan. Instead: avoid making the prompt too long, "
-        "use version v4.0.1 as this is a small change"
-    )
-
-
-def test_post_tool_exit_plan_mode_synthesizes_user_on_silent_rejection(
-    session_dir, monkeypatch
-) -> None:
-    """Rejection without a follow-up comment still yields a User turn boundary."""
-    monkeypatch.setattr(
-        "claude_smart.events.post_tool.ids.resolve_project_id",
-        lambda cwd=None: "demo",
-    )
-    post_tool.handle(
-        {
-            "session_id": "s1",
-            "tool_name": "ExitPlanMode",
-            "tool_input": {"plan": "# Plan"},
-            "tool_response": (
-                "The user doesn't want to proceed with this tool use. "
-                "The tool use was rejected."
-            ),
-            "cwd": "/some/repo",
-        }
-    )
-    records = state.read_all("s1")
-    assert [r["role"] for r in records] == ["Assistant_tool", "User"]
-    assert records[-1]["content"] == "Rejected the plan."
-
-
-def test_post_tool_exit_plan_mode_rejection_with_empty_followup_collapses(
-    session_dir, monkeypatch
-) -> None:
-    """A rejection with an empty followup after the marker still emits the
-    bare ``Rejected the plan.`` content — no dangling ``Instead:`` prefix
-    with nothing after it.
-    """
-    monkeypatch.setattr(
-        "claude_smart.events.post_tool.ids.resolve_project_id",
-        lambda cwd=None: "demo",
-    )
-    post_tool.handle(
-        {
-            "session_id": "s1",
-            "tool_name": "ExitPlanMode",
-            "tool_input": {"plan": "# Plan"},
-            "tool_response": (
-                "The user doesn't want to proceed with this tool use. "
-                "To tell you how to proceed, the user said:\n"
-            ),
-            "cwd": "/some/repo",
-        }
-    )
-    records = state.read_all("s1")
-    assert [r["role"] for r in records] == ["Assistant_tool", "User"]
-    assert records[-1]["content"] == "Rejected the plan."
-
-
-def test_post_tool_exit_plan_mode_flattens_list_content_blocks(
-    session_dir, monkeypatch
-) -> None:
-    """tool_response.content as a list of ``{type, text}`` blocks — the
-    shape Claude Code actually emits for tool results — must be scanned.
-    """
-    monkeypatch.setattr(
-        "claude_smart.events.post_tool.ids.resolve_project_id",
-        lambda cwd=None: "demo",
-    )
-    post_tool.handle(
-        {
-            "session_id": "s1",
-            "tool_name": "ExitPlanMode",
-            "tool_input": {"plan": "# Plan"},
-            "tool_response": {
-                "content": [
-                    {"type": "text", "text": "Your plan has been saved."},
-                    {"type": "text", "text": "User has approved your plan."},
-                ]
-            },
-            "cwd": "/some/repo",
-        }
-    )
-    records = state.read_all("s1")
-    assert [r["role"] for r in records] == ["Assistant_tool", "User"]
-    assert records[-1]["content"] == "Approved the plan."
-
-
-def test_post_tool_non_plan_tool_does_not_synthesize_user(
-    session_dir, monkeypatch
-) -> None:
-    """Only ExitPlanMode should produce a synthetic User record."""
-    monkeypatch.setattr(
-        "claude_smart.events.post_tool.ids.resolve_project_id",
-        lambda cwd=None: "demo",
-    )
-    post_tool.handle(
-        {
-            "session_id": "s1",
-            "tool_name": "Bash",
-            "tool_input": {"command": "echo User has approved your plan"},
-            "tool_response": "User has approved your plan (echoed)",
         }
     )
     records = state.read_all("s1")
     assert [r["role"] for r in records] == ["Assistant_tool"]
+    assert records[0]["tool_name"] == "ExitPlanMode"
 
 
 def test_post_tool_truncates_oversized_string(session_dir) -> None:
@@ -408,6 +266,310 @@ def test_stop_captures_exit_plan_mode_plan_as_assistant_text(
     content = records[-1]["content"]
     assert "Thinking…" in content
     assert "Plan:\n# Plan\n\nStep 1. do X\nStep 2. do Y" in content
+
+
+def test_stop_synthesizes_user_record_on_plan_approval(
+    session_dir, tmp_path, monkeypatch
+) -> None:
+    """Plan approval arrives as a ``tool_result`` in the transcript — Stop
+    must mint a User turn for it so reflexio sees the decision signal.
+
+    PostToolUse fires before the user decides (tool_response carries only the
+    plan payload), so the approval text never reaches the hook payload. The
+    transcript is the only place it exists.
+    """
+    transcript = _write_transcript(
+        tmp_path,
+        [
+            {"type": "user", "message": {"content": "plan it"}},
+            {
+                "type": "assistant",
+                "message": {
+                    "content": [
+                        {
+                            "type": "tool_use",
+                            "name": "ExitPlanMode",
+                            "input": {"plan": "# Plan"},
+                        }
+                    ]
+                },
+            },
+            {
+                "type": "user",
+                "message": {
+                    "content": [
+                        {
+                            "type": "tool_result",
+                            "content": (
+                                "Your plan has been saved.\n"
+                                "User has approved your plan. You can now start coding."
+                            ),
+                        }
+                    ]
+                },
+            },
+            {
+                "type": "assistant",
+                "message": {"content": [{"type": "text", "text": "Done."}]},
+            },
+        ],
+    )
+    monkeypatch.setattr(
+        "claude_smart.publish.publish_unpublished",
+        lambda **_: ("nothing", 0),
+    )
+    stop.handle(
+        {
+            "session_id": "s1",
+            "transcript_path": str(transcript),
+            "cwd": "/some/repo",
+        }
+    )
+    records = state.read_all("s1")
+    roles = [r["role"] for r in records]
+    assert roles == ["User", "Assistant"]
+    assert records[0]["content"] == "Approved the plan."
+
+
+def test_stop_synthesizes_user_record_on_plan_rejection_with_comment(
+    session_dir, tmp_path, monkeypatch
+) -> None:
+    """Rejection-with-feedback: the user's comment is the correction signal,
+    hoisted from after ``the user said:`` into the User record content.
+    """
+    rejection_text = (
+        "The user doesn't want to proceed with this tool use. "
+        "The tool use was rejected. To tell you how to proceed, the user said:\n"
+        "avoid making the prompt too long, use v4.0.1"
+    )
+    transcript = _write_transcript(
+        tmp_path,
+        [
+            {"type": "user", "message": {"content": "plan it"}},
+            {
+                "type": "assistant",
+                "message": {
+                    "content": [
+                        {
+                            "type": "tool_use",
+                            "name": "ExitPlanMode",
+                            "input": {"plan": "# Plan"},
+                        }
+                    ]
+                },
+            },
+            {
+                "type": "user",
+                "message": {
+                    "content": [{"type": "tool_result", "content": rejection_text}]
+                },
+            },
+        ],
+    )
+    monkeypatch.setattr(
+        "claude_smart.publish.publish_unpublished",
+        lambda **_: ("nothing", 0),
+    )
+    stop.handle({"session_id": "s1", "transcript_path": str(transcript)})
+    records = state.read_all("s1")
+    assert records[0]["role"] == "User"
+    assert records[0]["content"] == (
+        "Rejected the plan. Instead: avoid making the prompt too long, use v4.0.1"
+    )
+
+
+def test_stop_synthesizes_user_record_on_silent_plan_rejection(
+    session_dir, tmp_path, monkeypatch
+) -> None:
+    """Rejection without a follow-up comment still emits a User record."""
+    transcript = _write_transcript(
+        tmp_path,
+        [
+            {"type": "user", "message": {"content": "plan it"}},
+            {
+                "type": "assistant",
+                "message": {
+                    "content": [
+                        {
+                            "type": "tool_use",
+                            "name": "ExitPlanMode",
+                            "input": {"plan": "# Plan"},
+                        }
+                    ]
+                },
+            },
+            {
+                "type": "user",
+                "message": {
+                    "content": [
+                        {
+                            "type": "tool_result",
+                            "content": (
+                                "The user doesn't want to proceed with this tool use. "
+                                "The tool use was rejected."
+                            ),
+                        }
+                    ]
+                },
+            },
+        ],
+    )
+    monkeypatch.setattr(
+        "claude_smart.publish.publish_unpublished",
+        lambda **_: ("nothing", 0),
+    )
+    stop.handle({"session_id": "s1", "transcript_path": str(transcript)})
+    records = state.read_all("s1")
+    assert records[0]["role"] == "User"
+    assert records[0]["content"] == "Rejected the plan."
+
+
+def test_stop_plan_decision_handles_list_content_shape(
+    session_dir, tmp_path, monkeypatch
+) -> None:
+    """tool_result content can be a list of ``{type: text, text: …}`` blocks —
+    the scanner must match markers across that shape too.
+    """
+    transcript = _write_transcript(
+        tmp_path,
+        [
+            {"type": "user", "message": {"content": "plan it"}},
+            {
+                "type": "assistant",
+                "message": {
+                    "content": [
+                        {
+                            "type": "tool_use",
+                            "name": "ExitPlanMode",
+                            "input": {"plan": "# Plan"},
+                        }
+                    ]
+                },
+            },
+            {
+                "type": "user",
+                "message": {
+                    "content": [
+                        {
+                            "type": "tool_result",
+                            "content": [
+                                {"type": "text", "text": "Your plan has been saved."},
+                                {"type": "text", "text": "User has approved your plan."},
+                            ],
+                        }
+                    ]
+                },
+            },
+        ],
+    )
+    monkeypatch.setattr(
+        "claude_smart.publish.publish_unpublished",
+        lambda **_: ("nothing", 0),
+    )
+    stop.handle({"session_id": "s1", "transcript_path": str(transcript)})
+    records = state.read_all("s1")
+    assert records[0]["role"] == "User"
+    assert records[0]["content"] == "Approved the plan."
+
+
+def test_stop_plan_decision_ignores_prior_turn(
+    session_dir, tmp_path, monkeypatch
+) -> None:
+    """Plan decisions in *previous* turns were already published — only the
+    current turn's decisions (if any) should be synthesized now.
+    """
+    transcript = _write_transcript(
+        tmp_path,
+        [
+            {"type": "user", "message": {"content": "first plan"}},
+            {
+                "type": "assistant",
+                "message": {
+                    "content": [
+                        {
+                            "type": "tool_use",
+                            "name": "ExitPlanMode",
+                            "input": {"plan": "# old"},
+                        }
+                    ]
+                },
+            },
+            {
+                "type": "user",
+                "message": {
+                    "content": [
+                        {
+                            "type": "tool_result",
+                            "content": "User has approved your plan.",
+                        }
+                    ]
+                },
+            },
+            {"type": "user", "message": {"content": "follow-up, no plan"}},
+            {
+                "type": "assistant",
+                "message": {"content": [{"type": "text", "text": "Ok."}]},
+            },
+        ],
+    )
+    monkeypatch.setattr(
+        "claude_smart.publish.publish_unpublished",
+        lambda **_: ("nothing", 0),
+    )
+    stop.handle({"session_id": "s1", "transcript_path": str(transcript)})
+    records = state.read_all("s1")
+    assert [r["role"] for r in records] == ["Assistant"]
+
+
+def test_stop_plan_decision_ignores_non_exitplanmode_tool_result_with_marker_text(
+    session_dir, tmp_path, monkeypatch
+) -> None:
+    """A non-plan tool whose output happens to contain the marker text must
+    NOT be synthesized as a plan decision. The scanner only treats a
+    ``tool_result`` as a decision when the immediately-preceding assistant
+    ``tool_use`` was ``ExitPlanMode``.
+    """
+    transcript = _write_transcript(
+        tmp_path,
+        [
+            {"type": "user", "message": {"content": "do thing"}},
+            {
+                "type": "assistant",
+                "message": {
+                    "content": [
+                        {
+                            "type": "tool_use",
+                            "name": "Bash",
+                            "input": {"command": "echo 'User has approved your plan.'"},
+                        }
+                    ]
+                },
+            },
+            {
+                "type": "user",
+                "message": {
+                    "content": [
+                        {
+                            "type": "tool_result",
+                            "content": "User has approved your plan.\n",
+                        }
+                    ]
+                },
+            },
+            {
+                "type": "assistant",
+                "message": {"content": [{"type": "text", "text": "Done."}]},
+            },
+        ],
+    )
+    monkeypatch.setattr(
+        "claude_smart.publish.publish_unpublished",
+        lambda **_: ("nothing", 0),
+    )
+    stop.handle({"session_id": "s1", "transcript_path": str(transcript)})
+    records = state.read_all("s1")
+    # Only the Assistant record should be appended — no synthetic User turn.
+    assert [r["role"] for r in records] == ["Assistant"]
 
 
 def test_stop_exit_plan_mode_plan_interleaves_with_text_blocks_in_order(
@@ -625,8 +787,25 @@ def test_stop_stamps_user_id_from_payload_cwd(
     assert records[-1]["user_id"] == "proj::/some/repo"
 
 
+def _stub_user_prompt_adapter(monkeypatch, *, playbooks=None, profiles=None, calls=None):
+    class Stub:
+        def search_both(self, **kwargs):
+            if calls is not None:
+                calls.append(kwargs)
+            return (list(playbooks or []), list(profiles or []))
+
+    monkeypatch.setattr(
+        "claude_smart.context_inject.Adapter", lambda *a, **kw: Stub()
+    )
+    monkeypatch.setattr(
+        "claude_smart.events.user_prompt.ids.resolve_project_id",
+        lambda *_a, **_kw: "demo",
+    )
+
+
 def test_user_prompt_stamps_user_id_from_payload_cwd(session_dir, monkeypatch) -> None:
     """User record carries user_id resolved from the hook payload's cwd."""
+    _stub_user_prompt_adapter(monkeypatch)
     monkeypatch.setattr(
         "claude_smart.events.user_prompt.ids.resolve_project_id",
         lambda cwd=None: f"proj::{cwd}",
@@ -636,6 +815,86 @@ def test_user_prompt_stamps_user_id_from_payload_cwd(session_dir, monkeypatch) -
     assert records[-1]["role"] == "User"
     assert records[-1]["content"] == "hello"
     assert records[-1]["user_id"] == "proj::/some/repo"
+
+
+def test_user_prompt_injects_context_when_hits_present(session_dir, monkeypatch) -> None:
+    """A prompt with matching profiles/playbooks injects additionalContext."""
+    calls: list[dict[str, Any]] = []
+    _stub_user_prompt_adapter(
+        monkeypatch,
+        playbooks=[{"content": "run uv sync after edits", "trigger": "pyproject.toml"}],
+        profiles=[{"content": "prefers anyio over asyncio"}],
+        calls=calls,
+    )
+    buf = io.StringIO()
+    monkeypatch.setattr(sys, "stdout", buf)
+    user_prompt.handle(
+        {"session_id": "s1", "prompt": "edit pyproject.toml", "cwd": "/r"}
+    )
+    payload = json.loads(buf.getvalue().strip())
+    assert payload["hookSpecificOutput"]["hookEventName"] == "UserPromptSubmit"
+    markdown = payload["hookSpecificOutput"]["additionalContext"]
+    assert "run uv sync after edits" in markdown
+    assert "prefers anyio over asyncio" in markdown
+    # Prompt text is passed verbatim as the search query.
+    assert calls[0]["project_id"] == "demo"
+    assert calls[0]["query"] == "edit pyproject.toml"
+    # The prompt is still buffered for downstream extraction.
+    records = state.read_all("s1")
+    assert records[-1]["role"] == "User"
+    assert records[-1]["content"] == "edit pyproject.toml"
+    # The citation registry is populated so Stop can resolve cs-cite ids.
+    registry = state.read_injected("s1")
+    assert registry, "expected injected registry to hold at least one entry"
+    kinds = {entry["kind"] for entry in registry.values()}
+    assert kinds == {"playbook", "profile"}
+    for cite_id, entry in registry.items():
+        assert cite_id[0] in {"r", "p"}
+        assert entry["content"]
+        assert entry["title"]
+
+
+def test_user_prompt_writes_nothing_when_search_empty(session_dir, monkeypatch) -> None:
+    """No hits → no stdout output, but the prompt is still buffered."""
+    _stub_user_prompt_adapter(monkeypatch, playbooks=[], profiles=[])
+    buf = io.StringIO()
+    monkeypatch.setattr(sys, "stdout", buf)
+    user_prompt.handle({"session_id": "s1", "prompt": "anything", "cwd": "/r"})
+    assert buf.getvalue() == ""
+    assert state.read_all("s1")[-1]["content"] == "anything"
+
+
+def test_user_prompt_buffers_even_when_search_raises(session_dir, monkeypatch) -> None:
+    """A failing search must not prevent the prompt from being buffered."""
+
+    class Boom:
+        def search_both(self, **_kw):
+            raise RuntimeError("reflexio down")
+
+    monkeypatch.setattr(
+        "claude_smart.context_inject.Adapter", lambda *a, **kw: Boom()
+    )
+    monkeypatch.setattr(
+        "claude_smart.events.user_prompt.ids.resolve_project_id",
+        lambda *_a, **_kw: "demo",
+    )
+    buf = io.StringIO()
+    monkeypatch.setattr(sys, "stdout", buf)
+    user_prompt.handle({"session_id": "s1", "prompt": "hello", "cwd": "/r"})
+    assert buf.getvalue() == ""
+    assert state.read_all("s1")[-1]["content"] == "hello"
+
+
+def test_user_prompt_noop_on_empty_prompt(session_dir, monkeypatch) -> None:
+    """Empty prompt → nothing buffered, nothing emitted, no search attempted."""
+    calls: list[dict[str, Any]] = []
+    _stub_user_prompt_adapter(monkeypatch, calls=calls)
+    buf = io.StringIO()
+    monkeypatch.setattr(sys, "stdout", buf)
+    user_prompt.handle({"session_id": "s1", "prompt": "", "cwd": "/r"})
+    assert state.read_all("s1") == []
+    assert buf.getvalue() == ""
+    assert calls == []
 
 
 def test_stop_without_session_is_noop(session_dir) -> None:
@@ -996,7 +1255,7 @@ def _stub_pretool_adapter(monkeypatch, *, playbooks=None, profiles=None, calls=N
                 calls.append(kwargs)
             return (list(playbooks or []), list(profiles or []))
 
-    monkeypatch.setattr("claude_smart.events.pre_tool.Adapter", lambda *a, **kw: Stub())
+    monkeypatch.setattr("claude_smart.context_inject.Adapter", lambda *a, **kw: Stub())
     monkeypatch.setattr(
         "claude_smart.events.pre_tool.ids.resolve_project_id",
         lambda *_a, **_kw: "demo",

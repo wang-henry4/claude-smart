@@ -37,7 +37,7 @@
 </p>
 
 <p align="center">
-  It learns both corrections and successful execution patterns—so Claude Code avoids repeating mistakes and reuses what works. Claude Code steadily adapts to <i>how you like</i> to work—across projects, codebases, and sessions.
+  It learns both corrections and successful execution patterns—so Claude Code avoids repeating mistakes and reuses what works. Playbook rules travel with you across every project; per-project profiles capture how you like to work on each repo.
 </p>
 
 <p align="center">
@@ -69,7 +69,7 @@ Four ways this changes what Claude Code can do for you:
 
   Instead of re-exploring, Claude starts from the proven path—reducing planning steps, latency, and token usage.
 
-- 🌐 **Project-wide, not session-siloed:** Session memory disappears with the conversation. The project playbook persists and improves across every session in that repo.
+- 🌐 **Global playbook, project-scoped profiles:** Session memory disappears with the conversation. The playbook persists *globally* — rules learned in one repo are available in every repo you work in — while user profiles stay scoped to the current project so per-repo preferences don't leak across projects.
 
 - 🪶 **Better context without prompt bloat:** Distilled, deduplicated playbooks stay in dozens of tokens—not thousands—even as the project grows.
 
@@ -124,7 +124,7 @@ Developing the plugin itself? See [DEVELOPER.md](./DEVELOPER.md#developing-local
 
 ## Dashboard
 
-A web UI for browsing session histories, inspecting user profiles, and editing project playbooks. The dashboard auto-starts alongside the backend, so you can open **http://localhost:3001** directly. Or run `/claude-smart:dashboard` in Claude Code to launch dashboard in browser.
+A web UI for browsing session histories, inspecting user profiles, and editing playbook rules. The dashboard auto-starts alongside the backend, so you can open **http://localhost:3001** directly. Or run `/claude-smart:dashboard` in Claude Code to launch dashboard in browser.
 
 <p align="center">
   <img src="assets/profile_dashboard.png" alt="Profile dashboard" width="49%">
@@ -137,8 +137,8 @@ A web UI for browsing session histories, inspecting user profiles, and editing p
 
 claude-smart builds two artifacts as you work and injects them into Claude at the start of every new session:
 
-- **User profile** — session-scoped preferences (stack, role, small quirks). *e.g.* "uses pnpm, not npm"; "prefers terse answers"; "backend engineer — explain frontend with backend analogues."
-- **Project playbook** — durable, generalized rules accumulated across every session in the repo. Each says when it applies and why. *e.g.* "always pass `--run` to `npm test` — watch mode hangs CI"; "use real Postgres for integration tests — mocks once hid a broken migration."
+- **User profile** (project-scoped) — preferences about how you work in this specific repo (stack, role, small quirks). *e.g.* "uses pnpm, not npm"; "prefers terse answers"; "backend engineer — explain frontend with backend analogues."
+- **Playbook** (global, cross-project) — durable, generalized rules accumulated across every session, shared across every project you use claude-smart in. Each rule says when it applies and why, so a rule learned in one repo only fires in the contexts where it's relevant. *e.g.* "always pass `--run` to `npm test` — watch mode hangs CI"; "use real Postgres for integration tests — mocks once hid a broken migration."
 
 Playbooks clean themselves up: correct the same thing twice and they merge; change your mind and the old one is archived.
 
@@ -147,8 +147,10 @@ Under the hood: hooks watch your turns, tool calls, and Claude's replies, auto-f
 **Citations (`cs-cite`).** At the end of a reply, Claude may run:
 
 ```
-⏺ Bash(cs-cite p1-2d57)
-  ⎿  ✨ 1 claude-smart learning applied
+⏺ Bash(cs-cite r1-252,p1-5aed)
+  ⎿  (No output)
+
+⏺ ✨ 2 claude-smart learnings applied
 ```
 
 That signals a profile entry (`p…`) or playbook rule (`r…`) materially shaped the reply. Open the interaction's detail page in the [dashboard](#dashboard) to see the exact cited item.
@@ -162,7 +164,7 @@ See [ARCHITECTURE.md](./ARCHITECTURE.md) for hooks, data flow, and reflexio deta
 | Command | What it does |
 | --- | --- |
 | `/dashboard` | Open the dashboard in your browser, auto-starting the reflexio backend and dashboard services if they aren't already running. |
-| `/show` | Print the current project playbook plus the current session's user profiles (same markdown that `SessionStart` injects). Use it to audit what playbooks and preferences Claude is being told to follow. |
+| `/show` | Print the current (global) playbook plus the current project's user profiles (same markdown that `SessionStart` injects). Use it to audit what playbooks and preferences Claude is being told to follow. |
 | `/learn` | Force reflexio to run extraction *now* on the current session's unpublished interactions. Without this, extraction runs at the end of the session or on reflexio's batch interval. |
 | `/tag [note]` | Tag the most recent turn as a correction, for cases the automatic heuristic missed. The note becomes the correction description the extractor sees. |
 | `/restart` | Restart the reflexio backend and dashboard to pick up new changes (e.g. after upgrading the plugin or editing local reflexio code). |

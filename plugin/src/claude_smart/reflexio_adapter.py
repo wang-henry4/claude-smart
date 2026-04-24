@@ -166,14 +166,17 @@ class Adapter:
     # Reads (used by SessionStart)
     # -----------------------------------------------------------------
 
-    def fetch_project_playbooks(self, project_id: str, top_k: int = 10) -> list[Any]:
-        """Fetch CURRENT playbooks for this project, broad priming for SessionStart."""
+    def fetch_playbooks(self, top_k: int = 10) -> list[Any]:
+        """Fetch CURRENT playbooks globally (across projects) for SessionStart priming.
+
+        Playbooks are not scoped by ``agent_version``/``user_id`` on retrieval
+        so lessons learned in one project are available in every project.
+        """
         client = self._get_client()
         if client is None:
             return []
         try:
             response = client.search_user_playbooks(
-                agent_version=project_id,
                 user_id=None,
                 status_filter=[None],  # None => CURRENT in reflexio's filter API
                 top_k=top_k,
@@ -199,13 +202,14 @@ class Adapter:
             return []
         return _extract_items(response, "user_profiles")
 
-    def search_playbooks(
-        self, *, project_id: str, query: str, top_k: int = 5
-    ) -> list[Any]:
+    def search_playbooks(self, *, query: str, top_k: int = 5) -> list[Any]:
         """Query-aware CURRENT playbook search via reflexio hybrid retrieval.
 
+        Playbooks are retrieved globally (no ``agent_version`` / ``user_id``
+        filter) so lessons learned in one project are findable from any
+        project.
+
         Args:
-            project_id (str): Scopes to playbooks tagged with this agent_version.
             query (str): Free-text query; routed through BM25 + vector RRF.
             top_k (int): Cap on results. Defaults to 5 for just-in-time inject.
 
@@ -217,7 +221,6 @@ class Adapter:
             return []
         try:
             response = client.search_user_playbooks(
-                agent_version=project_id,
                 user_id=None,
                 query=query,
                 status_filter=[None],
@@ -270,15 +273,16 @@ class Adapter:
     ) -> tuple[list[Any], list[Any]]:
         """Run ``search_playbooks`` + ``search_profiles`` concurrently.
 
+        Playbook retrieval is global (``project_id`` is not forwarded to it);
+        profile retrieval stays project-scoped.
+
         Returns:
             tuple[list[Any], list[Any]]: ``(playbooks, profiles)``. Each leg
                 absorbs its own exceptions and returns ``[]`` on failure, so
                 this wrapper never raises.
         """
         return self._fan_out(
-            playbook_call=lambda: self.search_playbooks(
-                project_id=project_id, query=query, top_k=top_k
-            ),
+            playbook_call=lambda: self.search_playbooks(query=query, top_k=top_k),
             profile_call=lambda: self.search_profiles(
                 project_id=project_id, query=query, top_k=top_k
             ),
@@ -291,11 +295,12 @@ class Adapter:
         playbook_top_k: int = 10,
         profile_top_k: int = 20,
     ) -> tuple[list[Any], list[Any]]:
-        """Parallel broad fetch for SessionStart (empty-query, recency order)."""
+        """Parallel broad fetch for SessionStart (empty-query, recency order).
+
+        Playbooks are fetched globally; profiles are scoped to ``project_id``.
+        """
         return self._fan_out(
-            playbook_call=lambda: self.fetch_project_playbooks(
-                project_id, top_k=playbook_top_k
-            ),
+            playbook_call=lambda: self.fetch_playbooks(top_k=playbook_top_k),
             profile_call=lambda: self.fetch_project_profiles(
                 project_id, top_k=profile_top_k
             ),

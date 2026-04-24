@@ -1,22 +1,20 @@
 """PreToolUse hook — just-in-time playbook + profile inject before a mutating tool.
 
 Fires only for tools listed in ``hooks.json``'s PreToolUse matcher
-(Edit/Write/NotebookEdit/Bash). Composes a query from the tool call,
-runs playbook + profile search in parallel, and injects the top hits as
-``hookSpecificOutput.additionalContext`` so Claude sees relevant rules
-immediately before executing the action.
+(Edit/Write/NotebookEdit/Bash). Composes a query from the tool call and
+delegates to ``context_inject.emit_context`` for the shared
+search-render-emit pipeline, falling back to ``hook.emit_continue`` when
+there is nothing to inject or the search raises.
 """
 
 from __future__ import annotations
 
-import json
-import sys
-import time
+import logging
 from typing import Any
 
-from claude_smart import context_format, cs_cite, hook, ids, query_compose, state
-from claude_smart.reflexio_adapter import Adapter
+from claude_smart import context_inject, hook, ids, query_compose
 
+_LOGGER = logging.getLogger(__name__)
 _TOP_K = 3
 
 
@@ -35,34 +33,16 @@ def handle(payload: dict[str, Any]) -> None:
         return
 
     project_id = ids.resolve_project_id(payload.get("cwd"))
-    playbooks, profiles = Adapter().search_both(
-        project_id=project_id,
-        query=query,
-        top_k=_TOP_K,
-    )
-    markdown, registry = context_format.render_inline_with_registry(
-        project_id=project_id,
-        playbooks=playbooks,
-        profiles=profiles,
-    )
-    if not markdown:
-        hook.emit_continue()
-        return
-
-    cs_cite.ensure_installed()
-    state.append_injected(
-        session_id,
-        (dict(entry, ts=int(time.time())) for entry in registry),
-    )
-
-    sys.stdout.write(
-        json.dumps(
-            {
-                "hookSpecificOutput": {
-                    "hookEventName": "PreToolUse",
-                    "additionalContext": markdown,
-                }
-            }
+    try:
+        emitted = context_inject.emit_context(
+            session_id=session_id,
+            project_id=project_id,
+            query=query,
+            hook_event_name="PreToolUse",
+            top_k=_TOP_K,
         )
-    )
-    sys.stdout.write("\n")
+    except Exception as exc:  # noqa: BLE001 — never block a tool call.
+        _LOGGER.debug("pre_tool context inject failed: %s", exc)
+        emitted = False
+    if not emitted:
+        hook.emit_continue()

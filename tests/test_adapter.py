@@ -79,7 +79,7 @@ def test_publish_trivially_true_when_no_interactions() -> None:
 def test_fetch_playbooks_reads_user_playbooks_field() -> None:
     resp = SimpleNamespace(user_playbooks=[{"content": "rule"}])
     a = _adapter_with(_FakeClient(playbook_resp=resp))
-    assert a.fetch_project_playbooks("p1") == [{"content": "rule"}]
+    assert a.fetch_playbooks() == [{"content": "rule"}]
 
 
 def test_fetch_profiles_reads_user_profiles_field() -> None:
@@ -90,7 +90,7 @@ def test_fetch_profiles_reads_user_profiles_field() -> None:
 
 def test_fetch_helpers_return_empty_on_unknown_shape() -> None:
     a = _adapter_with(_FakeClient(playbook_resp=object(), profile_resp=object()))
-    assert a.fetch_project_playbooks("p1") == []
+    assert a.fetch_playbooks() == []
     assert a.fetch_project_profiles("p1") == []
 
 
@@ -135,9 +135,10 @@ def test_search_playbooks_passes_query_and_hybrid_mode() -> None:
         playbook_resp=SimpleNamespace(user_playbooks=[{"content": "rule"}])
     )
     a = _adapter_with(client)
-    result = a.search_playbooks(project_id="proj", query="config.toml", top_k=3)
+    result = a.search_playbooks(query="config.toml", top_k=3)
     assert result == [{"content": "rule"}]
-    assert client.playbook_kwargs["agent_version"] == "proj"
+    # Playbooks are retrieved globally: no agent_version / user_id filter.
+    assert "agent_version" not in client.playbook_kwargs
     assert client.playbook_kwargs["user_id"] is None
     assert client.playbook_kwargs["query"] == "config.toml"
     assert client.playbook_kwargs["top_k"] == 3
@@ -217,12 +218,14 @@ def test_fetch_both_parallelizes_broad_fetch() -> None:
     assert client.profile_kwargs["query"] == ""
 
 
-def test_fetch_project_playbooks_default_top_k_is_tightened() -> None:
+def test_fetch_playbooks_default_top_k_is_tightened() -> None:
     """SessionStart's broad inject used to be 50; narrowed because PreToolUse carries specificity."""
     client = _RecordingClient(playbook_resp=SimpleNamespace(user_playbooks=[]))
     a = _adapter_with(client)
-    a.fetch_project_playbooks("proj")
+    a.fetch_playbooks()
     assert client.playbook_kwargs["top_k"] == 10
+    # Retrieval is global: no agent_version filter.
+    assert "agent_version" not in client.playbook_kwargs
 
 
 # -----------------------------------------------------------------------------

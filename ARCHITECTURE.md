@@ -4,9 +4,10 @@ Technical reference for how `claude-smart` wires Claude Code's lifecycle hooks t
 
 ## Core components
 
-1. **5 lifecycle hooks** (`plugin/hooks/hooks.json`)
-   - `SessionStart` — fetches the project playbook from reflexio and injects it as `additionalContext`.
-   - `UserPromptSubmit` — buffers each user turn, heuristically flags corrections.
+1. **6 lifecycle hooks** (`plugin/hooks/hooks.json`)
+   - `SessionStart` — fetches the playbook from reflexio and injects it as `additionalContext`.
+   - `UserPromptSubmit` — buffers each user turn, heuristically flags corrections, and searches reflexio with the prompt text to inject matching profile/playbook hits as `additionalContext`.
+   - `PreToolUse` — searches reflexio keyed on the first line of the tool-call text (Bash command, Edit `new_string`, etc.) and injects top matches as `additionalContext`.
    - `PostToolUse` — records tool invocations for later extraction.
    - `Stop` — finalizes the assistant turn from the transcript, publishes to reflexio.
    - `SessionEnd` — flushes the remaining buffer with `force_extraction=True`.
@@ -29,7 +30,7 @@ Claude Code session
                                         └────────────┬────────────┘
                                                      │
                                                      ▼
-Next session → SessionStart → search_user_playbooks(agent_version=project_id)
+Next session → SessionStart → search_user_playbooks (no agent_version/user_id filter)
               → additionalContext injected into Claude's system prompt
 ```
 
@@ -37,11 +38,11 @@ Next session → SessionStart → search_user_playbooks(agent_version=project_id
 
 | Reflexio field | claude-smart value |
 | --- | --- |
-| `user_id` | Claude Code `session_id` — scopes profiles to the current conversation |
-| `agent_version` | `project_id` (git-toplevel basename) — stable across sessions, so playbooks accumulate project-wide |
+| `user_id` | `project_id` (git-toplevel basename) — scopes profiles to the current project |
+| `agent_version` | `project_id` on *write*; no filter on *read* — playbooks are tagged by project for provenance but retrieved globally |
 | `session_id` | Claude Code `session_id` — for reflexio's deferred success evaluation |
 
-Cross-session playbook retrieval uses `search_user_playbooks(agent_version=project_id, user_id=None)` — playbooks written from any prior session in this project surface for every future session.
+Playbook retrieval is global: `fetch_playbooks` / `search_playbooks` in `plugin/src/claude_smart/reflexio_adapter.py` call `search_user_playbooks` with no `agent_version` / `user_id` filter, so every playbook written on this machine surfaces for every future session regardless of project.
 
 ## Extraction signals
 

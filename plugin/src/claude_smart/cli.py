@@ -183,23 +183,23 @@ def cmd_uninstall(_args: argparse.Namespace) -> int:
 
 
 def cmd_show(args: argparse.Namespace) -> int:
-    """Print the current project playbook and project user profiles.
+    """Print the global playbook and this project's user profiles.
 
-    Both playbooks and profiles are now scoped to the project (resolved from
-    cwd via ``ids.resolve_project_id``), so output is identical regardless of
-    which session is active in the repo.
+    Playbooks are fetched globally (shared across every project) so lessons
+    learned anywhere are visible here. Profiles stay scoped to this project
+    (resolved from cwd via ``ids.resolve_project_id``).
 
     Args:
         args (argparse.Namespace): Parsed CLI args. Honors ``args.project``
-            (override project id).
+            (override project id for the profile fetch).
 
     Returns:
         int: 0 on success.
     """
     project_id = args.project or ids.resolve_project_id()
     adapter = Adapter()
-    playbooks = adapter.fetch_project_playbooks(project_id, top_k=3)
-    profiles: list = adapter.fetch_project_profiles(project_id, top_k=3)
+    playbooks = adapter.fetch_playbooks(top_k=3)
+    profiles = adapter.fetch_project_profiles(project_id, top_k=3)
     md = context_format.render(
         project_id=project_id, playbooks=playbooks, profiles=profiles
     )
