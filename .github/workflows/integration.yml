@@ -1,0 +1,47 @@
+name: integration
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: integration-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  integration:
+    name: integration (${{ matrix.os }}, node ${{ matrix.node }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        node: ['18', '20', '22']
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - uses: astral-sh/setup-uv@v3
+
+      - name: Install Claude Code CLI
+        run: npm install -g @anthropic-ai/claude-code@stable
+
+      - name: Run integration test
+        env:
+          # Plugin install is local-config only and shouldn't hit the API,
+          # but a dummy key prevents a hang at any first-launch login prompt.
+          # Real SessionStart-via-session testing would need a real key (see
+          # tests/integration/NOTES.md).
+          ANTHROPIC_API_KEY: dummy-for-plugin-install
+        run: bash tests/integration/integration.sh all
