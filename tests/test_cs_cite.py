@@ -223,6 +223,7 @@ def test_cs_cite_script_strips_cs_prefix() -> None:
 def test_dummy() -> None:
     """dummy test"""
     assert True
+    assert True
 
 
 def test_cs_cite_script_normalizes_uppercase() -> None:
