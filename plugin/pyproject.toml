@@ -1,6 +1,6 @@
 [project]
 name = "claude-smart"
-version = "0.1.14"
+version = "0.1.15"
 description = "Self-improving Claude Code plugin — learns from corrections via reflexio"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -22,7 +22,7 @@ claude-smart = "claude_smart.cli:main"
 # `git update-index --skip-worktree plugin/pyproject.toml plugin/uv.lock`
 # hides the local divergence from `git status`.
 # [tool.uv.sources]
-# reflexio-ai = { path = "../reflexio", editable = true }
+# reflexio-ai = { path = "/Users/yilu/repos/claude-smart/reflexio", editable = true }
 
 [build-system]
 requires = ["hatchling"]
