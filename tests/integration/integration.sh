@@ -46,7 +46,25 @@ export HOME="$INTEG_HOME"
 export CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT"
 
 log()  { printf '[integration] %s\n' "$*" >&2; }
-fail() { printf '[integration] FAIL: %s\n' "$*" >&2; exit 1; }
+# Always try to stop services and dump logs on any failure. Cleanup on
+# success runs as a normal stage so we can still see the logs if the
+# trap path fires.
+fail() {
+  printf '[integration] FAIL: %s\n' "$*" >&2
+  dump_logs
+  stage_cleanup
+  exit 1
+}
+
+# Keep ERR trap for unexpected failures (e.g., unhandled command failures)
+on_error() {
+  local rc=$?
+  dump_logs
+  stage_cleanup
+  exit "$rc"
+}
+trap on_error ERR
+
 
 dump_logs() {
   for f in "$HOME/.claude-smart/backend.log" "$HOME/.claude-smart/dashboard.log"; do
@@ -135,25 +153,6 @@ stage_cleanup() {
   bash "$PLUGIN_ROOT/scripts/dashboard-service.sh" stop >/dev/null 2>&1 || true
   bash "$PLUGIN_ROOT/scripts/backend-service.sh"   stop >/dev/null 2>&1 || true
 }
-
-# Always try to stop services and dump logs on any failure. Cleanup on
-# success runs as a normal stage so we can still see the logs if the
-# trap path fires.
-fail() {
-  printf '[integration] FAIL: %s\n' "$*" >&2
-  dump_logs
-  stage_cleanup
-  exit 1
-}
-
-# Keep ERR trap for unexpected failures (e.g., unhandled command failures)
-on_error() {
-  local rc=$?
-  dump_logs
-  stage_cleanup
-  exit "$rc"
-}
-trap on_error ERR
 
 CMD="${1:-all}"
 case "$CMD" in
