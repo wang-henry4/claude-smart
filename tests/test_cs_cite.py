@@ -220,6 +220,11 @@ def test_cs_cite_script_strips_cs_prefix() -> None:
     assert r.stdout == "✨ 3 claude-smart learnings applied\n"
 
 
+def test_dummy() -> None:
+    """dummy test"""
+    assert True
+
+
 def test_cs_cite_script_normalizes_uppercase() -> None:
     r = _run_cs_cite("P1-AB12,R2-CD34")
     assert r.returncode == 0
