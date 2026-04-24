@@ -105,6 +105,7 @@ claude plugin uninstall claude-smart@reflexioai
 Local data under `~/.reflexio/` and `~/.claude-smart/` is left in place — remove manually if desired.
 
 Developing the plugin itself? See [DEVELOPER.md](./DEVELOPER.md#developing-locally).
+> **Not supported:** Claude Code Cowork and claude.ai/code web — they run in a remote sandbox, so the local backend/dashboard and `~/.reflexio/` aren't reachable.
 
 ---
 

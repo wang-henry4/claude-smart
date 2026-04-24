@@ -44,10 +44,10 @@ ensure-remote-reflexio: ## Ensure [tool.uv.sources] is commented out so publishe
 	@echo "→ ensuring [tool.uv.sources] override is commented out in $(PYPROJECT)"
 	@sed -i.bak -E \
 	    -e 's|^\[tool\.uv\.sources\]$$|# [tool.uv.sources]|' \
-	    -e 's|^reflexio-ai = \{ path = "\.\./reflexio", editable = true \}$$|# reflexio-ai = { path = "../reflexio", editable = true }|' \
+	    -e 's|^(reflexio-ai = \{ path = .*)$$|# \1|' \
 	    $(PYPROJECT)
 	@rm -f $(PYPROJECT).bak
-	@if grep -qE '^\[tool\.uv\.sources\]|^reflexio-ai = \{ path = "\.\./reflexio"' $(PYPROJECT); then \
+	@if grep -qE '^\[tool\.uv\.sources\]|^reflexio-ai = \{ path =' $(PYPROJECT); then \
 	  echo "error: [tool.uv.sources] block in $(PYPROJECT) is still active after sed" >&2; \
 	  exit 1; \
 	fi
