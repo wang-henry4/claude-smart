@@ -25,31 +25,53 @@ function runClaude(args, { spinnerLabel } = {}) {
       stdio: useSpinner ? ["inherit", "pipe", "pipe"] : "inherit",
     });
 
-    let spinnerActive = false;
-    let timer = null;
     if (useSpinner) {
       const frames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
       let i = 0;
-      spinnerActive = true;
-      const render = () => {
-        process.stdout.write(`\r${frames[i = (i + 1) % frames.length]} ${spinnerLabel}`);
-      };
-      render();
-      timer = setInterval(render, 80);
+      let spinTimer = null;
+      let rearmTimer = null;
+      let exited = false;
 
-      const clear = () => {
-        if (!spinnerActive) return;
-        spinnerActive = false;
-        clearInterval(timer);
-        process.stdout.write("\r\x1b[2K");
+      const draw = () => {
+        process.stdout.write(`\r⠿ ${spinnerLabel}`.replace("⠿", frames[i = (i + 1) % frames.length]));
       };
+      const clearLine = () => process.stdout.write("\r\x1b[2K");
+      const startSpin = () => {
+        if (spinTimer || exited) return;
+        draw();
+        spinTimer = setInterval(draw, 80);
+      };
+      const stopSpin = () => {
+        if (!spinTimer) return;
+        clearInterval(spinTimer);
+        spinTimer = null;
+        clearLine();
+      };
+      const armRearm = () => {
+        if (rearmTimer) clearTimeout(rearmTimer);
+        rearmTimer = setTimeout(() => {
+          rearmTimer = null;
+          startSpin();
+        }, 200);
+      };
+
+      startSpin();
+
       const passthrough = (stream) => (chunk) => {
-        clear();
+        stopSpin();
         stream.write(chunk);
+        armRearm();
       };
       child.stdout.on("data", passthrough(process.stdout));
       child.stderr.on("data", passthrough(process.stderr));
-      child.on("exit", clear);
+      child.on("exit", () => {
+        exited = true;
+        if (rearmTimer) {
+          clearTimeout(rearmTimer);
+          rearmTimer = null;
+        }
+        stopSpin();
+      });
     }
 
     child.on("exit", (code) => resolve(typeof code === "number" ? code : 1));
