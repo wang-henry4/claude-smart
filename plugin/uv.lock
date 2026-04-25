@@ -2371,7 +2371,7 @@ wheels = [
 
 [[package]]
 name = "reflexio-ai"
-version = "0.2.15"
+version = "0.2.16"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiohttp" },
@@ -2405,9 +2405,9 @@ dependencies = [
     { name = "websocket-client" },
     { name = "xlsxwriter" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/31/16/cd3bdee0f266cd730ec69f73b2f56c48265b2e93af3253ebaaf2fa0d7462/reflexio_ai-0.2.15.tar.gz", hash = "sha256:522aca1c8028f9490eba20e085ccb44576c90af08b33610c5e4c79af0a858d4b", size = 536144, upload-time = "2026-04-23T17:01:44.26Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/d5/97/7df5d06329d04e75c3fc9cde101a847b609502f9e7d6b884d71f3bafb95d/reflexio_ai-0.2.16.tar.gz", hash = "sha256:a0103e91e080e6c7e5cb9029123f3a0423836096e69b0f7ca4515632b40a9072", size = 539880, upload-time = "2026-04-24T06:30:18.395Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/72/85/6be36abde2ed51eeba10efd05709726c8c0b76b05b956310f7c20c56c47e/reflexio_ai-0.2.15-py3-none-any.whl", hash = "sha256:1741c9599cbbb424ffe68f27f3e604aedfb23e7a94a361f16c28f07fd319c229", size = 723455, upload-time = "2026-04-23T17:01:45.779Z" },
+    { url = "https://files.pythonhosted.org/packages/f7/50/7924efe2b13550a3006ff0e8e45ae779f015277ab57a1f143a1000b4e8c8/reflexio_ai-0.2.16-py3-none-any.whl", hash = "sha256:b1ba38cf124edcdd3bb6b4deb2f88d3b34251cc6f654f590693ac1dc1eaeb593", size = 728022, upload-time = "2026-04-24T06:30:16.372Z" },
 ]
 
 [[package]]
