@@ -9,7 +9,7 @@
  */
 "use strict";
 
-const { execFileSync, execSync } = require("child_process");
+const { execFileSync, execSync, spawn } = require("child_process");
 const { appendFileSync, existsSync, mkdirSync, readFileSync } = require("fs");
 const { homedir } = require("os");
 const { dirname, join } = require("path");
@@ -17,6 +17,45 @@ const { dirname, join } = require("path");
 const DEFAULT_MARKETPLACE_SOURCE = "ReflexioAI/claude-smart";
 const PLUGIN_SPEC = "claude-smart@reflexioai";
 const REFLEXIO_ENV_PATH = join(homedir(), ".reflexio", ".env");
+
+function runClaude(args, { spinnerLabel } = {}) {
+  const useSpinner = Boolean(spinnerLabel) && process.stdout.isTTY && !process.env.CI;
+  return new Promise((resolve) => {
+    const child = spawn("claude", args, {
+      stdio: useSpinner ? ["inherit", "pipe", "pipe"] : "inherit",
+    });
+
+    let spinnerActive = false;
+    let timer = null;
+    if (useSpinner) {
+      const frames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
+      let i = 0;
+      spinnerActive = true;
+      const render = () => {
+        process.stdout.write(`\r${frames[i = (i + 1) % frames.length]} ${spinnerLabel}`);
+      };
+      render();
+      timer = setInterval(render, 80);
+
+      const clear = () => {
+        if (!spinnerActive) return;
+        spinnerActive = false;
+        clearInterval(timer);
+        process.stdout.write("\r\x1b[2K");
+      };
+      const passthrough = (stream) => (chunk) => {
+        clear();
+        stream.write(chunk);
+      };
+      child.stdout.on("data", passthrough(process.stdout));
+      child.stderr.on("data", passthrough(process.stderr));
+      child.on("exit", clear);
+    }
+
+    child.on("exit", (code) => resolve(typeof code === "number" ? code : 1));
+    child.on("error", () => resolve(1));
+  });
+}
 
 function hasClaudeCli() {
   const probe = process.platform === "win32" ? "where claude" : "command -v claude";
@@ -79,7 +118,7 @@ function parseSource(args) {
   return value;
 }
 
-function runUpdate() {
+async function runUpdate() {
   if (!hasClaudeCli()) {
     process.stderr.write(
       "error: 'claude' CLI not found on PATH. " +
@@ -88,10 +127,10 @@ function runUpdate() {
     process.exit(1);
   }
 
-  try {
-    execFileSync("claude", ["plugin", "update", PLUGIN_SPEC], { stdio: "inherit" });
-  } catch (err) {
-    const code = typeof err.status === "number" ? err.status : 1;
+  const code = await runClaude(["plugin", "update", PLUGIN_SPEC], {
+    spinnerLabel: "Checking for claude-smart updates…",
+  });
+  if (code !== 0) {
     process.stderr.write(`error: \`claude plugin update ${PLUGIN_SPEC}\` failed (exit ${code})\n`);
     process.exit(code);
   }
@@ -99,7 +138,7 @@ function runUpdate() {
   process.stdout.write("\nclaude-smart updated. Restart Claude Code to apply.\n");
 }
 
-function runUninstall() {
+async function runUninstall() {
   if (!hasClaudeCli()) {
     process.stderr.write(
       "error: 'claude' CLI not found on PATH. " +
@@ -108,10 +147,10 @@ function runUninstall() {
     process.exit(1);
   }
 
-  try {
-    execFileSync("claude", ["plugin", "uninstall", PLUGIN_SPEC], { stdio: "inherit" });
-  } catch (err) {
-    const code = typeof err.status === "number" ? err.status : 1;
+  const code = await runClaude(["plugin", "uninstall", PLUGIN_SPEC], {
+    spinnerLabel: "Uninstalling claude-smart…",
+  });
+  if (code !== 0) {
     process.stderr.write(
       `error: \`claude plugin uninstall ${PLUGIN_SPEC}\` failed (exit ${code})\n`,
     );
@@ -128,7 +167,7 @@ function runUninstall() {
   );
 }
 
-function runInstall(args) {
+async function runInstall(args) {
   if (!hasClaudeCli()) {
     process.stderr.write(
       "error: 'claude' CLI not found on PATH. " +
@@ -139,17 +178,15 @@ function runInstall(args) {
 
   const source = parseSource(args);
   const steps = [
-    ["plugin", "marketplace", "add", source],
-    ["plugin", "install", PLUGIN_SPEC],
+    { args: ["plugin", "marketplace", "add", source], label: "Adding marketplace…" },
+    { args: ["plugin", "install", PLUGIN_SPEC], label: "Installing claude-smart…" },
   ];
 
-  for (const stepArgs of steps) {
-    try {
-      execFileSync("claude", stepArgs, { stdio: "inherit" });
-    } catch (err) {
-      const code = typeof err.status === "number" ? err.status : 1;
+  for (const step of steps) {
+    const code = await runClaude(step.args, { spinnerLabel: step.label });
+    if (code !== 0) {
       process.stderr.write(
-        `error: \`claude ${stepArgs.join(" ")}\` failed (exit ${code})\n`,
+        `error: \`claude ${step.args.join(" ")}\` failed (exit ${code})\n`,
       );
       process.exit(code);
     }
@@ -173,7 +210,7 @@ function runInstall(args) {
   );
 }
 
-function main() {
+async function main() {
   const args = process.argv.slice(2);
   const cmd = args[0] || "install";
 
@@ -183,17 +220,17 @@ function main() {
   }
 
   if (cmd === "install") {
-    runInstall(args.slice(1));
+    await runInstall(args.slice(1));
     return;
   }
 
   if (cmd === "update") {
-    runUpdate();
+    await runUpdate();
     return;
   }
 
   if (cmd === "uninstall") {
-    runUninstall();
+    await runUninstall();
     return;
   }
 
@@ -203,4 +240,7 @@ function main() {
   process.exit(1);
 }
 
-main();
+main().catch((err) => {
+  process.stderr.write(`claude-smart: ${err && err.message ? err.message : err}\n`);
+  process.exit(1);
+});
