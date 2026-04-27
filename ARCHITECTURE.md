@@ -48,7 +48,7 @@ Playbook retrieval is global: `fetch_playbooks` / `search_playbooks` in `plugin/
 
 Reflexio's playbook extractor only emits rules from two signals:
 
-- **Correction SOPs** — the user rejected the agent's behavior (explicit `/tag`, or heuristically-detected corrective phrasing).
+- **Correction SOPs** — the user rejected the agent's behavior (explicit `/learn`, or heuristically-detected corrective phrasing).
 - **Success-path recipes** — completed tasks that produced concrete values, formulas, or tool sequences.
 
 Identity/context facts (e.g. "I'm a data scientist", "we freeze merges Thursday") route to the **profile** only; they don't become playbook rules. This is intentional — see `reflexio/server/services/playbook/playbook_extractor.py` and the playbook prompt v4.0.0 for the full gating logic.

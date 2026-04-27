@@ -1,6 +1,6 @@
 """User-facing CLI for claude-smart.
 
-Exposes five subcommands:
+Exposes the following subcommands:
 
 - ``install``: register the GitHub marketplace and install the plugin into
   Claude Code, then seed ``~/.reflexio/.env`` with the local-provider flags.
@@ -11,10 +11,9 @@ Exposes five subcommands:
   in place.
 - ``show``: print the current project playbook and project user profiles
   (as markdown).
-- ``learn``: force reflexio to run extraction on all unpublished interactions.
-- ``tag "<note>"``: append a ``[correction]``-prefixed turn to the active
-  session buffer so reflexio's extractor sees the signal on the next
-  ``learn`` pass.
+- ``learn "<note>"``: append a ``[correction]``-prefixed turn to the active
+  session buffer (default note: "the previous answer was wrong"), then
+  publish unpublished interactions and force reflexio extraction now.
 - ``restart``: stop and restart the reflexio backend + dashboard services
   (rebuilding the dashboard bundle) so local edits under the ``reflexio``
   submodule or ``plugin/dashboard/`` take effect without restarting Claude
@@ -24,7 +23,6 @@ Exposes five subcommands:
 from __future__ import annotations
 
 import argparse
-import os
 import shutil
 import subprocess
 import sys
@@ -210,37 +208,31 @@ def cmd_show(args: argparse.Namespace) -> int:
 
 
 def cmd_learn(args: argparse.Namespace) -> int:
+    """Flag the previous turn as a correction and force reflexio extraction.
+
+    Appends a ``[correction]``-prefixed user turn to the active session's
+    JSONL buffer so reflexio's extractor sees the signal, then publishes
+    unpublished interactions with ``force_extraction=True`` so extraction
+    runs immediately rather than at the next batch interval.
+
+    Args:
+        args (argparse.Namespace): Parsed CLI args. Honors ``args.note``
+            (defaults to "the previous answer was wrong" when empty),
+            ``args.session`` (defaults to most-recent), and ``args.project``
+            (defaults to ``ids.resolve_project_id()``).
+
+    Returns:
+        int: 0 on success or no-op (no active session, or correction recorded
+            but nothing to publish), 1 if reflexio is unreachable. When
+            reflexio is unreachable, the ``[correction]`` row is still
+            appended to the local JSONL — only the publish/extraction step
+            is skipped, so the next successful publish drains it.
+    """
     session_id = args.session or _latest_session_id()
     if not session_id:
         sys.stdout.write("No active claude-smart session buffer found.\n")
         return 0
     project_id = args.project or ids.resolve_project_id()
-    status, count = publish.publish_unpublished(
-        session_id=session_id,
-        project_id=project_id,
-        force_extraction=True,
-        skip_aggregation=True,
-    )
-    if status == "nothing":
-        sys.stdout.write(f"Session `{session_id}`: nothing to learn from.\n")
-        return 0
-    if status == "ok":
-        sys.stdout.write(
-            f"Published {count} interactions to reflexio "
-            f"(user_id={project_id}, session_id={session_id}). "
-            "Extraction running.\n"
-        )
-        return 0
-    sys.stdout.write(_REFLEXIO_UNREACHABLE_MSG)
-    return 1
-
-
-def cmd_tag(args: argparse.Namespace) -> int:
-    session_id = args.session or _latest_session_id()
-    if not session_id:
-        sys.stdout.write("No active claude-smart session buffer found.\n")
-        return 0
-    project_id = args.project or ids.resolve_project_id(os.getcwd())
     note = args.note or "the previous answer was wrong"
     state.append(
         session_id,
@@ -259,12 +251,12 @@ def cmd_tag(args: argparse.Namespace) -> int:
     )
     if status == "ok":
         sys.stdout.write(
-            f"Tagged correction on session `{session_id}` and forced extraction "
+            f"Recorded correction on session `{session_id}` and forced extraction "
             f"over {count} interactions.\n"
         )
         return 0
     if status == "nothing":
-        sys.stdout.write(f"Tagged correction on session `{session_id}`.\n")
+        sys.stdout.write(f"Recorded correction on session `{session_id}`.\n")
         return 0
     sys.stdout.write(_REFLEXIO_UNREACHABLE_MSG)
     return 1
@@ -495,16 +487,14 @@ def _build_parser() -> argparse.ArgumentParser:
     sh.add_argument("--project", help="Override project id")
     sh.set_defaults(func=cmd_show)
 
-    ln = sub.add_parser("learn", help="Force reflexio extraction now")
-    ln.add_argument("--project", help="Override project id")
+    ln = sub.add_parser(
+        "learn",
+        help="Flag the last turn as a correction and force reflexio extraction now",
+    )
+    ln.add_argument("note", nargs="?", default="", help="Correction description")
     ln.add_argument("--session", help="Session id (defaults to latest)")
+    ln.add_argument("--project", help="Override project id")
     ln.set_defaults(func=cmd_learn)
-
-    tg = sub.add_parser("tag", help="Tag the current session with a correction note")
-    tg.add_argument("note", nargs="?", default="", help="Correction description")
-    tg.add_argument("--session", help="Session id (defaults to latest)")
-    tg.add_argument("--project", help="Override project id")
-    tg.set_defaults(func=cmd_tag)
 
     ca = sub.add_parser(
         "clear-all",

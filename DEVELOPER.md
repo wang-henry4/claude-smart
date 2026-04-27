@@ -371,7 +371,7 @@ Inside Claude Code:
 /show
 ```
 
-On a fresh project: `_No playbook or profiles yet for project <name>._`. Have a conversation, correct Claude on something (e.g. `"no, don't use X — use Y"`), then run `/learn`. After ~20–30 seconds, `/show` surfaces the new rule.
+On a fresh project: `_No playbook or profiles yet for project <name>._`. Have a conversation, correct Claude on something (e.g. `"no, don't use X — use Y"`), then run `/learn` — this flags the previous turn as a correction and forces extraction immediately. After ~20–30 seconds, `/show` surfaces the new rule.
 
 ### Verifying which mode is live
 

@@ -1,7 +1,7 @@
 # Troubleshooting
 
 **SessionStart injects nothing after a correction.**
-Extraction is async by default. Run `/learn` to force it, wait ~20–30s, then run `/show` — no new session needed. `/show` shows whether the rule was actually extracted.
+Extraction is async by default. Run `/learn` to flag the previous turn as a correction and force extraction, wait ~20–30s, then run `/show` — no new session needed. `/show` shows whether the rule was actually extracted.
 
 **Reflexio refuses to boot with "no embedding-capable provider".**
 Check that `CLAUDE_SMART_USE_LOCAL_EMBEDDING=1` is in `~/.reflexio/.env` *and* that `chromadb` is installed in the venv (`uv run --project plugin python -c "import chromadb"` should print nothing). If you'd rather use a cloud embedder instead, drop the env flag and set `OPENAI_API_KEY` or `GEMINI_API_KEY` in the same file.

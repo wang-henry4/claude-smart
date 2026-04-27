@@ -118,7 +118,7 @@ Developing the plugin itself? See [DEVELOPER.md](./DEVELOPER.md#developing-local
 - 🔌 **No external API call** — semantic search runs on an in-process ONNX embedder (all-MiniLM-L6-v2), and all data (profiles, playbooks, interaction buffers) is stored locally on your machine (`~/.reflexio/` and `~/.claude-smart/`).
 - 🔎 **Hybrid search** — Playbooks and profiles are indexed with vector + BM25 search for fast, robust retrieval.
 - 🧪 **Offline resilience** — If the reflexio backend is down, hooks buffer to disk; the next successful publish drains them.
-- 🧰 **Manual correction tag** — `/claude-smart:tag` flags the last turn as a correction so the extractor weights it heavily.
+- 🧰 **Manual correction marker** — `/claude-smart:learn` flags the last turn as a correction so the extractor weights it heavily.
 
 ---
 
@@ -142,7 +142,7 @@ claude-smart builds two artifacts as you work and injects them into Claude at th
 
 Playbooks clean themselves up: correct the same thing twice and they merge; change your mind and the old one is archived.
 
-Under the hood: hooks watch your turns, tool calls, and Claude's replies, auto-flagging corrections (or anything you `/tag`). At session end (or on `/learn`), [reflexio](https://github.com/ReflexioAI/reflexio) — the self-improving engine that powers claude-smart — extracts profile entries and playbook rules. Next session, both get injected into the system prompt — run `/show` to see what Claude is being told. Everything runs on your machine.
+Under the hood: hooks watch your turns, tool calls, and Claude's replies, auto-flagging corrections (or anything you flag with `/learn`). At session end (or on `/learn`), [reflexio](https://github.com/ReflexioAI/reflexio) — the self-improving engine that powers claude-smart — extracts profile entries and playbook rules. Next session, both get injected into the system prompt — run `/show` to see what Claude is being told. Everything runs on your machine.
 
 **Citations (`cs-cite`).** At the end of a reply, Claude may run:
 
@@ -165,8 +165,7 @@ See [ARCHITECTURE.md](./ARCHITECTURE.md) for hooks, data flow, and reflexio deta
 | --- | --- |
 | `/dashboard` | Open the dashboard in your browser, auto-starting the reflexio backend and dashboard services if they aren't already running. |
 | `/show` | Print the current (global) playbook plus the current project's user profiles (same markdown that `SessionStart` injects). Use it to audit what playbooks and preferences Claude is being told to follow. |
-| `/learn` | Force reflexio to run extraction *now* on the current session's unpublished interactions. Without this, extraction runs at the end of the session or on reflexio's batch interval. |
-| `/tag [note]` | Tag the most recent turn as a correction, for cases the automatic heuristic missed. The note becomes the correction description the extractor sees. |
+| `/learn [note]` | Flag the most recent turn as a correction (for cases the automatic heuristic missed) and force reflexio to run extraction *now* on the session's unpublished interactions. The optional note becomes the correction description the extractor sees. |
 | `/restart` | Restart the reflexio backend and dashboard to pick up new changes (e.g. after upgrading the plugin or editing local reflexio code). |
 | `/clear-all` | **Destructive.** Delete *all* reflexio interactions, profiles, and user playbooks. Use when you want to wipe learned state and start fresh. |
 
